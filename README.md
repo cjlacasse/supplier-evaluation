@@ -1,5 +1,9 @@
 # supplier-evaluation
-Sample Drupal 7 custom modules for a Supplier Evaluation Application used to manage, assess, and communicate with suppliers.
+A few sample Drupal 7 custom modules for a Supplier Evaluation Application used to manage, assess, and communicate with suppliers. Screenshots from each module:
+
+Interface
+
+![Alt text](/../Screenshots/Sample%20Application%20Interface.PNG?raw=true "Scorecard")
 
 Scorecard Module
 
