@@ -1,0 +1,1212 @@
+<?php
+
+drupal_add_css(drupal_get_path('module', 'company_x_import_module') . '/company_x_import_module.css', 'module', 'all');
+
+/*************************************************
+ *              IMPLEMENT THE HOOKS              *
+ *************************************************/
+function company_x_import_module_menu() {
+  $items = array();
+
+  //Import reports control panel
+  $items['import_control_panel'] = array(
+    'title' => t('Import Control Panel'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('import_control_panel_form'),
+    'access callback' => 'user_access',
+    'access arguments' => array('QCA Import Control Panel Access'),
+  );
+
+  //Import Administration
+  $items['import_administration'] = array(
+    'title' => t('Import Settings'),
+    'description' => 'Allows the user to edit the import settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('import_administration_form'),
+    'access callback' => 'user_access',
+    'access arguments' => array('QCA Import Administration Access'),
+  );
+
+  //mill_x display all reports
+  $items['import_report_display_spring_grove'] = array(
+    'title' => 'mill_x Import Reports',
+    'page callback' => 'import_report_display_spring_grove',
+    'access callback' => 'user_access',
+    'access arguments' => array('QCA mill_x Reports Access'),
+  );
+
+  //mill_x generate delivery import report with pages
+  $items['delivery_import_report_spring_grove'] = array(
+    'title' => 'Generate Delivery Import Report with Pages',
+    'type' => MENU_CALLBACK,
+    'page callback' => 'delivery_import_report_spring_grove',
+    'access arguments' => array('access content'),
+  );
+
+  //mill_x generate quality import report with pages
+  $items['quality_import_report_spring_grove'] = array(
+    'title' => 'Generate Quality Import Report with Pages',
+    'type' => MENU_CALLBACK,
+    'page callback' => 'quality_import_report_spring_grove',
+    'access arguments' => array('access content'),
+  );
+
+  //mill_x Delivery error log details
+  $items['delivery_import_details_spring_grove'] = array(
+    'title' => t('Delivery Import Details'),
+    'type' => MENU_NORMAL_ITEM,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('delivery_import_details_spring_grove_form',1),
+   );
+
+  //mill_x Quality error log details
+  $items['quality_import_details_spring_grove'] = array(
+    'title' => t('Quality Import Details'),
+    'type' => MENU_NORMAL_ITEM,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('quality_import_details_spring_grove_form',1),
+    'access callback' => TRUE
+  );
+
+  //mill_y Delivery import report
+  $items['delivery_import_report_display_chillicothe'] = array(
+    'title' => t('mill_y'),
+    'page callback' => 'delivery_import_report_display_chillicothe',
+    'access callback' => TRUE
+  );
+
+  //mill_y mill_x Delivery error log details
+  $items['delivery_import_details_chillicothe'] = array(
+    'title' => t('Delivery Import Details CH'),
+    'type' => MENU_NORMAL_ITEM,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('delivery_import_details_chillicothe_form',1),//the 1 tells it to get the id after the first / in the path and pass it to the function. ie: delivery_import_details/17
+    'access callback' => TRUE
+   );
+
+  return $items;
+}
+
+ /************************************************
+ *              ADMINISTRATION CODE              *
+ *************************************************/
+
+//***This function displays the links to do manual imports
+function import_control_panel_form() {
+  //Links for importing to the test database
+  $form['fs_test_links'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Test Server Import'),
+  );
+
+  $form['fs_test_links']['test_import_links'] = array(
+    '#type' => 'markup',
+    '#markup' =>'
+       <a href="../phpscripts/test_import_delivery.php">Import Delivery File SG</a><br>
+       <a href="../phpscripts/test_import_quality.php">Import Quality File</a><br>
+       <a href="../phpscripts/test_import_service.php">Import Service File</a><br>
+       <a href="../phpscripts/test_import_delivery_ch.php">Import Delivery File CH</a><br>
+       <a href="../phpscripts/test_import_lead_time.php">Import Lead Time File</a><br>
+       <a href="../phpscripts/test_import_supplier_returns.php">Import Supplier Returns File</a><br>
+       <a href="../phpscripts/test_import_packing_slip_accuracy.php">Import Supplier Packing Slip File</a><br>',
+  );
+
+  //Links for importing to the production database
+  $form['fs_production_links'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Production Server Import'),
+  );
+
+  $form['fs_production_links']['production_import_links'] = array(
+    '#type' => 'markup',
+    '#markup' =>'
+       <a href="../phpscripts/production_import_delivery.php">Import Delivery File</a><br>
+       <a href="../phpscripts/production_import_quality.php">Import Quality File</a><br>
+       <a href="../phpscripts/production_import_service.php">Import Service File</a><br>',
+  );
+
+  $form['fs_temporary_import'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Temporary Import/Data Manipulation'),
+  );
+
+  $form['fs_temporary_import']['temporary_import_overview'] = array(
+    '#type' => 'markup',
+    '#markup' =>'Runs the code in the import_control_panel_form_submit function in the import module. We can switch it up to do whatever. After we run it, we should disable it (uncomment first few lines) so there will not be an accidental push of the button while DITH.<br /><br />',
+  );
+
+  $form['fs_temporary_import']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Execute'),
+  );
+
+  return $form;
+}
+
+function import_control_panel_form_submit($form, &$form_state)
+{
+    //Uncomment this code to disable the rest
+    $message = "The functionality is disabled for safety's sake. Edit the import_control_panel_form_submit function in the import module to enable it.";
+    drupal_set_message($message, $type = 'warning', $repeat = TRUE);
+    return;
+
+//***************************************************************************************
+//*****                  UPDATE FREQUENCY AND LAST SCORECARD DATE                   *****
+//***************************************************************************************
+
+//    $query = db_select('company_x_temp_frequency_change', 'g') //db table name and alias
+//    ->fields('g', array(
+//        'vendor_id',
+//        'frequency',
+//        'last_scorecard'));
+//    $results = $query->execute();
+//
+//  //Cycle through the records and assign the data to variables
+//  foreach ($results as $result)
+//  {
+//    $vendor_id = $result->vendor_id;
+//    $frequency = $result->frequency;
+//    $last_scorecard = $result->last_scorecard;
+//
+//    //find the match and write the new data
+//    $update = db_update('company_x_supplier_maintenance') //pick a table, thats it
+//    ->fields(array(
+//        'frequency_override' => $frequency,
+//        'last_scorecard_date' => $last_scorecard,
+//    ))
+//        ->condition('vendor', $vendor_id, '=')
+//        ->execute();
+//  }
+
+    //Message after form is submitted
+    $message = "The data manipulation is complete. Peace be with you.";
+    drupal_set_message($message, $type = 'status', $repeat = TRUE);
+  }
+
+//***This form allows the user to administer import settings
+function import_administration_form($form, &$form_state) {
+
+//Pull the existing data
+//Identify table and return desired fields
+  $query = db_select('company_x_keywords', 'g') //db table name and alias
+    ->fields('g', array(
+        'delivery_import_report_email',
+        'quality_import_report_email'));
+        //'delivery_import_report_email_ch'));
+  $results = $query->execute();
+
+  //Cycle through the records and assign the data to variables
+  foreach ($results as $result)
+  {
+     $delivery_import_report_email = $result->delivery_import_report_email;
+     $quality_import_report_email = $result->quality_import_report_email;
+     //$delivery_import_report_email_ch = $result->delivery_import_report_email_ch;
+  }
+
+  //Display fields
+  $form['fs_overview'] = array(
+     '#type' => 'fieldset',
+     '#title' => t('Overview'),
+   );
+
+  $form['fs_overview']['overview'] = array(
+  '#markup' => 'If an error is encountered while importing the Delivery or Quality data files, the system will send an email to the designated email addresses. You can enter multiple email addresses by separating them with a comma.',
+  );
+
+  $form['delivery_email'] = array(
+  '#type' => 'textfield',
+  '#size' => 75,
+  '#maxlength' => 250,
+  '#prefix' => '<table id="styled_table"><tr><td><b>Send Delivery import error reports to:</b></td><td>',
+  '#suffix' => '</td></tr>',
+  '#default_value' => $delivery_import_report_email,
+  );
+
+  $form['quality_email'] = array(
+  '#type' => 'textfield',
+  '#size' => 75,
+  '#maxlength' => 250,
+  //Use when we uncomment CH '#prefix' => '<tr><td width="260"><b>Send Quality import error reports to:</b></td><td>',
+  //Use when we uncomment CH '#suffix' => '</td></tr>',
+  '#prefix' => '<tr><td><b>Send Quality import error reports to:</b></td><td>',
+  '#suffix' => '</td></tr></table>',
+  '#default_value' => $quality_import_report_email,
+  );
+
+//  $form['delivery_email_ch'] = array(
+//  '#type' => 'textfield',
+//  '#size' => 40,
+//  '#maxlength' => 50,
+//  '#prefix' => '<table id="styled_table"><tr><td width="260"><b>Send CH Delivery import error reports to:</b></td><td>',
+//  '#suffix' => '</td></tr></table>',
+//  '#default_value' => $delivery_import_report_email_ch,
+//  );
+
+
+   $form['submit'] = array(
+     '#type' => 'submit',
+     '#value' => t('Save Settings'),
+   );
+
+   return $form;
+}
+
+//***Submit function for import administration
+function import_administration_form_submit($form, &$form_state) {
+
+  //Im grabbing the values from the form here
+  $delivery_import_report_email = $form_state['values']['delivery_email'];
+  $quality_import_report_email = $form_state['values']['quality_email'];
+
+  //Update the values in the company_x_keywords table
+  $comments_updated = db_update('company_x_keywords')
+     ->fields(array(
+        'delivery_import_report_email' => $delivery_import_report_email,
+        'quality_import_report_email' => $quality_import_report_email))
+     ->condition('id', '1', '=')
+     ->execute();
+
+  //Message after form is submitted
+  $message = "The import administration settings have been successfully updated";
+  drupal_set_message($message, $type = 'status', $repeat = TRUE); // status, warning, error are types
+}
+
+/*************************************************
+ *               SPRING GROVE CODE               *
+ *************************************************/
+
+//***mill_x delivery and quality import reports displayed in tabs
+function import_report_display_spring_grove() {
+
+  drupal_add_js(drupal_get_path('module', 'company_x_import_module') . '/jquery.url.js'); //used for paging
+  drupal_add_js(drupal_get_path('module', 'company_x_import_module') . '/company_x_import_module.js'); //used for paging
+
+  drupal_add_js('initializeTable_delivery();', 'inline'); //embed paging code in webpage
+  drupal_add_js('initializeTable_quality();', 'inline'); //embed paging code in webpage
+  drupal_add_library('system', 'ui.tabs'); //used for tabs
+
+  //Display fields
+  $form['import_report_tabs'] = array(
+     '#markup' => '<div id="tabs-nohdr">
+                      <ul>
+                         <li><a href="#tabs-1">Delivery</a></li>
+                         <li><a href="#tabs-2">Quality</a></li>
+                      </ul>
+                   <div id="tab-content">
+                      <div id="tabs-1">'
+   );
+
+  $form['fs_delivery_import_overview'] = array(
+     '#type' => 'fieldset',
+     '#title' => t('Overview'),
+   );
+
+  $form['fs_delivery_import_overview']['delivery_import_summary'] = array(
+     '#markup' => 'The Delivery import runs every Monday morning at 5:15AM. The source file is located here: \\ranchero.sg.glat.com\Groups\SapDownloadFiles\RTP\PRD\SUPPLIER_DELIVERY_SG_1001.csv',
+  );
+
+  $form['delivery_import_report'] = array(
+     '#type' => 'markup',
+     '#markup' => '<div id="table-container_delivery"></div></div>', //This is generated from the pages jquery
+  );
+
+  $form['import_report_tab_2'] = array(
+     '#markup' => '<div id="tabs-2">'
+   );
+
+  $form['fs_quality_import_overview'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Overview'),
+  );
+
+  $form['fs_quality_import_overview']['quality_import_summary'] = array(
+     '#markup' => 'The Quality import runs every month on days 9-12 at 5:30AM. The source file is located here: \\ranchero.sg.glat.com\Groups\ISO 9001 Procedures\R.M. Certified Raw Materials\Supplier_Quality_ytd.csv',
+  );
+
+  $form['quality_import_report'] = array(
+     '#type' => 'markup',
+     '#markup' => '<div id="table-container_quality"></div></div></div></div>', //This is generated from the pages jquery
+  );
+
+  return $form;
+}
+
+//***mill_x delivery import reports generated with pages
+function delivery_import_report_spring_grove () {
+//Configure the table header columns
+  $header = array(
+    array('data' => 'Date', 'field' => 'load_time', 'sort' => 'DESC'),
+    array('data' => 'Rows in File', 'field' => 'rows_in_file'),
+    array('data' => 'Rows Imported', 'field' => 'row_imported'),
+    array('data' => 'Error Count', 'field' => 'total_errors'),
+  );
+
+  //Set the database table and initial SelectQuery options
+   $select = db_select('company_x_delivery_log', 'g_unit')
+              ->extend('PagerDefault')
+              ->extend('TableSort');
+
+  //Get the desired fields
+  $select ->fields('g_unit', array('id', 'load_time', 'rows_in_file', 'row_imported', 'total_errors'))
+      ->limit(10)
+      ->orderByHeader($header)
+      ->orderBy('load_time', 'DESC');
+
+  //Execute the query
+  $results = $select->execute();
+
+  //Configure the table rows, making the first column a link to view the details
+  $rows = array();
+  foreach ($results as $row) {
+        $rows[] = array(
+            "<a href=\"/delivery_import_details_spring_grove/" . $row->id ."\">" . $row->load_time . '</a>',
+            $row->rows_in_file,
+            $row->row_imported,
+            $row->total_errors,
+        );
+  }
+
+  $html = theme('table', array('header' => $header, 'empty' => 'There are no import reports to display','rows' => $rows ));
+  $html .= theme('pager');
+
+  die ($html);
+}
+
+//***mill_x quality import reports generated with pages
+function quality_import_report_spring_grove () {
+ //Configure the table header columns
+  $header_quality = array(
+    array('data' => 'Date', 'field' => 'load_time', 'sort' => 'DESC'),
+    array('data' => 'Rows in File', 'field' => 'rows_in_file'),
+    array('data' => 'Rows Imported', 'field' => 'row_imported'),
+    array('data' => 'Error Count', 'field' => 'total_errors'),
+  );
+
+  //Set the database table and initial SelectQuery options
+   $select = db_select('company_x_quality_log', 'g_unit')
+              ->extend('PagerDefault')
+              ->extend('TableSort');
+
+  //Get the desired fields
+  $select ->fields('g_unit', array('id', 'load_time', 'rows_in_file', 'row_imported', 'total_errors'))
+          ->limit(10)
+          ->orderByHeader($header_quality)
+          ->orderBy('load_time', 'DESC');
+
+  //Execute the query
+  $results = $select->execute();
+
+  //Configure the table rows, making the first column a link to view the details
+  $rows = array();
+  foreach ($results as $row) {
+        $rows[] = array(
+            "<a href=\"/quality_import_details_spring_grove/" . $row->id ."\">" . $row->load_time . '</a>',
+            $row->rows_in_file,
+            $row->row_imported,
+            $row->total_errors,
+        );
+  }
+
+  $html = theme('table', array('header' => $header_quality, 'empty' => 'There are no import reports to display','rows' => $rows ));
+  $html .= theme('pager');
+  die ($html);
+}
+
+//***mill_x displays delivery import error details and captures comments
+function delivery_import_details_spring_grove_form($form, &$form_state, $import_id) {
+
+//set a form element equal to the report id passed in so it can be used throughout the form
+//specifically in the submit handler's update query
+$form_state['storage']['import_id'] = $import_id;
+
+//Pull the report data for the specified report
+//Identify table and return desired fields
+  $query = db_select('company_x_delivery_log', 'g') //db table name and alias
+    ->condition('id', $import_id)
+    ->fields('g', array(
+        'id',
+        'load_time',
+        'file_size',
+        'rows_in_file',
+        'row_imported',
+        'connect_error',
+        'database_error',
+        'no_file_error',
+        'file_open_error',
+        'file_empty_error',
+        'empty_table_error',
+        'import_update_error',
+        'number_of_row_errors',
+        'comments'));
+  $results = $query->execute();
+
+  //Cycle through the records and assign the data to variables
+  foreach ($results as $result)
+  {
+     $load_time = $result->load_time;
+     $file_size = $result->file_size;
+     $rows_in_file = $result->rows_in_file;
+     $rows_imported = $result->row_imported;
+     $connect_error = $result->connect_error;
+     $database_error = $result->database_error;
+     $no_file_error = $result->no_file_error;
+     $file_open_error = $result->file_open_error;
+     $file_empty_error = $result->file_empty_error;
+     $import_update_error = $result->import_update_error;
+     $empty_table_error = $result->empty_table_error;
+     $number_of_row_errors = $result->number_of_row_errors;
+     $comments = $result->comments;
+  }
+
+  //Display fields
+  $form['fs_summary'] = array(
+     '#type' => 'fieldset',
+     '#title' => t('Summary'),
+   );
+
+  $form['fs_summary']['summary_column_1'] = array(
+  '#markup' => '<table><tr><td width="300">',
+  );
+
+  $form['fs_summary']['load_time'] = array(
+     '#markup' => '<b>Date:</b> '.$load_time,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['file_size'] = array(
+     '#markup' => '<b>File Size:</b> '.$file_size. ' KB',
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['rows_in_file'] = array(
+     '#markup' => '<b>Records in File:</b> '.$rows_in_file,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['rows_imported'] = array(
+     '#markup' => '<b>Records Imported:</b> '.$rows_imported,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['connect_error'] = array(
+     '#markup' => '<b>Connect Error:</b> '.$connect_error,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['database_error'] = array(
+     '#markup' => '<b>Database Error:</b> '.$database_error,
+     '#prefix' => '<p>',
+     '#suffix' => '</p></td>',
+  );
+
+  $form['fs_summary']['no_file_error'] = array(
+     '#markup' => '<b>File Missing Error:</b> '.$no_file_error,
+     '#prefix' => '<td><p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['file_open_error'] = array(
+     '#markup' => '<b>File Open Error:</b> '.$file_open_error,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['file_empty_error'] = array(
+     '#markup' => '<b>File Empty Error:</b> '.$file_empty_error,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['import_update_error'] = array(
+     '#markup' => '<b>Update Error:</b> '.$import_update_error,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['empty_table_error'] = array(
+     '#markup' => '<b>Empty Table Error:</b> '.$empty_table_error,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['number_of_row_errors'] = array(
+     '#markup' => '<b>Records with an Error:</b> '.$number_of_row_errors,
+     '#prefix' => '<p>',
+     '#suffix' => '</p></td></tr></table>',
+  );
+
+  $form['fs_error_details'] = array(
+     '#type' => 'fieldset',
+     '#title' => t('Record Error Details'),
+  );
+
+  $form['fs_error_details']['row_error_report'] = array(
+     '#type' => 'markup',
+     '#markup' => drupal_render(delivery_error_details_table_spring_grove($import_id)),
+  );
+
+  $form['fs_comments'] = array(
+     '#type' => 'fieldset',
+     '#title' => t('Comments'),
+  );
+
+  $form['fs_comments']['comments'] = array(
+     '#type' => 'textarea',
+     '#description' => t('Please enter any comments associated with this import.'),
+     '#maxlength' => 19999,
+     '#required' => False,
+     '#default_value' => $comments,
+   );
+
+   $form['delivery_save_comments'] = array(
+        '#type' => 'image_button',
+        '#src' => '../images/save3.png',
+        '#prefix' => '<span id="action_icon" class="beautytips grow" title="Save Comments">',
+        '#suffix' => '</span>',
+        '#submit' =>array('delivery_import_details_spring_grove_form_submit'),
+        '#name' =>'save_comments',
+      );
+
+      $form['delivery_import_details_back'] = array(
+         '#type' => 'image_button',
+         '#src' => '../images/go_back_6.png',
+         '#submit' => array('spring_grove_import_details_back'),
+         '#prefix' => '<span id="action_icon" class="beautytips grow" title="Return to list of Import Reports">',
+         '#suffix' => '</span>',
+         //'#name' => 'closure_date_back',
+       );
+
+   return $form;
+}
+
+//***mill_x displays quality import error details and captures comments
+function quality_import_details_spring_grove_form($form, &$form_state, $import_id) {
+
+//Set a form element to the report id passed in so it can be used throughout the form
+//specifically in the submit handler's update query
+$form_state['storage']['quality_import_id'] = $import_id;
+
+//Pull the report data for the specified report
+//Identify table and return desired fields
+  $query = db_select('company_x_quality_log', 'g') //db table name and alias
+    ->condition('id', $import_id)
+    ->fields('g', array(
+        'id',
+        'load_time',
+        'file_size',
+        'rows_in_file',
+        'row_imported',
+        'connect_error',
+        'database_error',
+        'no_file_error',
+        'file_open_error',
+        'file_empty_error',
+        'empty_table_error',
+        'import_update_error',
+        'number_of_row_errors',
+        'comments'));
+  $results = $query->execute();
+
+  //Cycle through the records and assign the data to variables
+  foreach ($results as $result)
+  {
+     $load_time = $result->load_time;
+     $file_size = $result->file_size;
+     $rows_in_file = $result->rows_in_file;
+     $rows_imported = $result->row_imported;
+     $connect_error = $result->connect_error;
+     $database_error = $result->database_error;
+     $no_file_error = $result->no_file_error;
+     $file_open_error = $result->file_open_error;
+     $file_empty_error = $result->file_empty_error;
+     $import_update_error = $result->import_update_error;
+     $empty_table_error = $result->empty_table_error;
+     $number_of_row_errors = $result->number_of_row_errors;
+     $comments = $result->comments;
+  }
+
+  //Display fields
+  $form['fs_quality_summary'] = array(
+     '#type' => 'fieldset',
+     '#title' => t('Summary'),
+   );
+
+  $form['fs_quality_summary']['quality_summary_column_1'] = array(
+  '#markup' => '<table><tr><td width="300">',
+  );
+
+  $form['fs_quality_summary']['quality_load_time'] = array(
+     '#markup' => '<b>Date:</b> '.$load_time,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_quality_summary']['quality_file_size'] = array(
+     '#markup' => '<b>File Size:</b> '.$file_size. ' KB',
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_quality_summary']['quality_rows_in_file'] = array(
+     '#markup' => '<b>Records in File:</b> '.$rows_in_file,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_quality_summary']['quality_rows_imported'] = array(
+     '#markup' => '<b>Records Imported:</b> '.$rows_imported,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_quality_summary']['quality_connect_error'] = array(
+     '#markup' => '<b>Connect Error:</b> '.$connect_error,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_quality_summary']['quality_database_error'] = array(
+     '#markup' => '<b>Database Error:</b> '.$database_error,
+     '#prefix' => '<p>',
+     '#suffix' => '</p></td>',
+  );
+
+  $form['fs_quality_summary']['quality_no_file_error'] = array(
+     '#markup' => '<b>File Missing Error:</b> '.$no_file_error,
+     '#prefix' => '<td><p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_quality_summary']['quality_file_open_error'] = array(
+     '#markup' => '<b>File Open Error:</b> '.$file_open_error,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_quality_summary']['quality_file_empty_error'] = array(
+     '#markup' => '<b>File Empty Error:</b> '.$file_empty_error,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_quality_summary']['quality_import_update_error'] = array(
+     '#markup' => '<b>Update Error:</b> '.$import_update_error,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_quality_summary']['quality_empty_table_error'] = array(
+     '#markup' => '<b>Empty Table Error:</b> '.$empty_table_error,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_quality_summary']['quality_number_of_row_errors'] = array(
+     '#markup' => '<b>Records with an Error:</b> '.$number_of_row_errors,
+     '#prefix' => '<p>',
+     '#suffix' => '</p></td></tr></table>',
+  );
+
+  $form['fs_quality_error_details'] = array(
+     '#type' => 'fieldset',
+     '#title' => t('Record Error Details'),
+  );
+
+  $form['fs_quality_error_details']['quality_row_error_report'] = array(
+     '#type' => 'markup',
+     '#markup' => drupal_render(quality_error_details_table_spring_grove($import_id)),
+  );
+
+  $form['fs_quality_comments'] = array(
+     '#type' => 'fieldset',
+     '#title' => t('Comments'),
+  );
+
+  $form['fs_quality_comments']['quality_comments'] = array(
+     '#type' => 'textarea',
+     '#description' => t('Please enter any comments associated with this import.'),
+     '#maxlength' => 19999,
+     '#required' => False,
+     '#default_value' => $comments,
+   );
+
+   $form['quality_save_comments'] = array(
+        '#type' => 'image_button',
+        '#src' => '../images/save3.png',
+        '#prefix' => '<span id="action_icon" class="beautytips grow" title="Save Comments">',
+        '#suffix' => '</span>',
+        '#submit' =>array('quality_import_details_spring_grove_form_submit'),
+        '#name' =>'save_comments',
+      );
+
+      $form['quality_import_details_back'] = array(
+         '#type' => 'image_button',
+         '#src' => '../images/go_back_6.png',
+         '#submit' => array('spring_grove_import_details_back'),
+         '#prefix' => '<span id="action_icon" class="beautytips grow" title="Return to list of Import Reports">',
+         '#suffix' => '</span>',
+         //'#name' => 'closure_date_back',
+       );
+
+   return $form;
+}
+
+function spring_grove_import_details_back(){
+    drupal_goto('import_report_display_spring_grove');
+}
+
+
+//***mill_x displays a list of the delivery row errors in a dapper little table
+function delivery_error_details_table_spring_grove($import_id) {
+
+  //Configure the table header columns
+  $header = array(
+    array('data' => 'Record'),
+    array('data' => 'Error'),
+  );
+
+  //Set the database table and initial SelectQuery options
+   $select = db_select('company_x_delivery_error_detail', 'g_unit')
+      ->condition('id', $import_id)
+      ->extend('PagerDefault')
+      ->extend('TableSort');
+
+  //Get the desired fields
+    $select ->fields('g_unit', array('id', 'row_error', 'row_number'))
+      ->limit(10)
+      ->orderByHeader($header)
+      ->orderBy('row_number', 'ASC');
+
+  //Execute the query
+  $results = $select->execute();
+
+  //Configure the table rows
+  $rows = array();
+  foreach ($results as $row) {
+     $rows[] = array(
+        $row->row_number,
+        $row->row_error,
+     );
+  }
+
+  $render_delivery_details['table'] = array(
+		'#theme' => 'table',
+		'#rows' => $rows,
+		'#empty' => 'No errors to report',
+		'#header' => $header,
+  );
+
+  $render_delivery_details['pager'] = array(
+		'#theme' => 'pager',
+  );
+
+  return $render_delivery_details;
+}
+
+//***mill_x displays a list of the delivery row errors in a dapper little table
+function quality_error_details_table_spring_grove($import_id) {
+
+  //Configure the table header columns
+  $header = array(
+    array('data' => 'Record'),
+    array('data' => 'Error'),
+  );
+
+  //Set the database table and initial SelectQuery options
+   $select = db_select('company_x_quality_error_detail', 'g_unit')
+      ->condition('id', $import_id)
+      ->extend('PagerDefault')
+      ->extend('TableSort');
+
+  //Get the desired fields
+    $select ->fields('g_unit', array('id', 'row_error', 'row_number'))
+      ->limit(10)
+      ->orderByHeader($header)
+      ->orderBy('row_number', 'ASC');
+
+  //Execute the query
+  $results = $select->execute();
+
+  //Configure the table rows
+  $rows = array();
+  foreach ($results as $row) {
+     $rows[] = array(
+        $row->row_number,
+        $row->row_error,
+     );
+  }
+
+  $render_quality_details['table'] = array(
+		'#theme' => 'table',
+		'#rows' => $rows,
+		'#empty' => 'No errors to report',
+		'#header' => $header,
+  );
+
+  $render_quality_details['pager'] = array(
+		'#theme' => 'pager',
+	);
+
+  return $render_quality_details;
+}
+
+//***mill_x submit function for delivery import details
+function delivery_import_details_spring_grove_form_submit($form, &$form_state) {
+
+  //Im grabbing the values from the form here
+  $comments = $form_state['values']['comments'];
+  $import_id = $form_state['storage']['import_id'];
+
+  //Update the values in the company_x_delivery_log table
+  $comments_updated = db_update('company_x_delivery_log')
+     ->fields(array(
+        'comments' => $comments))
+     ->condition('id', $import_id, '=')
+     ->execute();
+
+  //Message after form is submitted
+  $message = "The comments have been successfully updated";
+  drupal_set_message($message, $type = 'status', $repeat = TRUE); // status, warning, error are types
+}
+
+//***mill_x submit function for quality import details
+function quality_import_details_spring_grove_form_submit($form, &$form_state) {
+
+  //Im grabbing the values from the form here
+  $comments = $form_state['values']['quality_comments'];
+  $import_id = $form_state['storage']['quality_import_id'];
+
+  //Update the values in the company_x_quality_log table
+  $comments_updated = db_update('company_x_quality_log')
+     ->fields(array(
+        'comments' => $comments))
+     ->condition('id', $import_id, '=')
+     ->execute();
+
+  //Message after form is submitted
+  $message = "The comments have been successfully updated";
+  drupal_set_message($message, $type = 'status', $repeat = TRUE); // status, warning, error are types
+}
+
+ /************************************************
+ *               CHILLICOTHE CODE                *
+ *************************************************/
+
+//***mill_y displays all of the delivery import reports FOR CH MILL
+function delivery_import_report_display_chillicothe() {
+  //Display fields
+  $form['fs_delivery_import_overview'] = array(
+     '#type' => 'fieldset',
+     '#title' => t('Overview'),
+   );
+
+  $form['fs_delivery_import_overview']['delivery_import_summary'] = array(
+     '#markup' => 'The Delivery import runs every Monday morning at 5:15AM. The source file is located here: \\ranchero.sg.glat.com\Groups\SapDownloadFiles\RTP\PRD\SUPPLIER_DELIVERY_SG_1001.csv',
+  );
+
+  $form['delivery_import_report'] = array(
+     '#type' => 'markup',
+     '#markup' => delivery_import_report_chillicothe(),
+  );
+
+  return $form;
+}
+
+//***mill_y generates all of the delivery import log entries in a nice reportish way FOR CH MILL
+function delivery_import_report_chillicothe() {
+
+  //Configure the table header columns
+  $header = array(
+    array('data' => 'Date', 'field' => 'load_time', 'sort' => 'DESC'),
+    array('data' => 'Rows in File', 'field' => 'rows_in_file'),
+    array('data' => 'Rows Imported', 'field' => 'row_imported'),
+    array('data' => 'Error Count', 'field' => 'total_errors'),
+  );
+
+  //Set the database table and initial SelectQuery options
+   $select = db_select('company_x_delivery_log_ch', 'g_unit')
+              ->extend('PagerDefault')
+              ->element(0) //used to differentiate the pager since we have two pagers on one webpage
+              ->extend('TableSort');
+
+  //Get the desired fields
+  $select ->fields('g_unit', array('id', 'load_time', 'rows_in_file', 'row_imported', 'total_errors'))
+      ->limit(10)
+      ->orderByHeader($header)
+      ->orderBy('load_time', 'DESC');
+
+  //Execute the query
+  $results = $select->execute();
+
+  //Configure the table rows, making the first column a link to view the details
+  $rows = array();
+  foreach ($results as $row) {
+        $rows[] = array(
+            "<a href=\"/delivery_import_details_chillicothe/" . $row->id ."\">" . $row->load_time . '</a>',
+            $row->rows_in_file,
+            $row->row_imported,
+            $row->total_errors,
+        );
+  }
+
+  $output = theme('table', array('header' => $header, 'empty' => 'There are no import reports to display','rows' => $rows ));
+
+  //Add the pager
+  $output .= theme('pager', array('element' => 0)); //use the same element used above
+  return $output;
+}
+
+//*** mill_y displays delivery import error details and captures comments
+function delivery_import_details_chillicothe_form($form, &$form_state, $import_id) {
+
+//set a form element equal to the report id passed in so it can be used throughout the form
+//specifically in the submit handler's update query
+$form_state['storage']['import_id'] = $import_id;
+
+//Pull the report data for the specified report
+//Identify table and return desired fields
+  $query = db_select('company_x_delivery_log_ch', 'g') //db table name and alias
+    ->condition('id', $import_id)
+    ->fields('g', array(
+        'id',
+        'load_time',
+        'file_size',
+        'rows_in_file',
+        'row_imported',
+        'connect_error',
+        'database_error',
+        'no_file_error',
+        'file_open_error',
+        'file_empty_error',
+        'empty_table_error',
+        'import_update_error',
+        'number_of_row_errors',
+        'comments'));
+  $results = $query->execute();
+
+  //Cycle through the records and assign the data to variables
+  foreach ($results as $result)
+  {
+     $load_time = $result->load_time;
+     $file_size = $result->file_size;
+     $rows_in_file = $result->rows_in_file;
+     $rows_imported = $result->row_imported;
+     $connect_error = $result->connect_error;
+     $database_error = $result->database_error;
+     $no_file_error = $result->no_file_error;
+     $file_open_error = $result->file_open_error;
+     $file_empty_error = $result->file_empty_error;
+     $import_update_error = $result->import_update_error;
+     $empty_table_error = $result->empty_table_error;
+     $number_of_row_errors = $result->number_of_row_errors;
+     $comments = $result->comments;
+  }
+
+  //Display fields
+  $form['fs_summary'] = array(
+     '#type' => 'fieldset',
+     '#title' => t('Summary'),
+   );
+
+  $form['fs_summary']['summary_column_1'] = array(
+  '#markup' => '<table><tr><td width="300">',
+  );
+
+  $form['fs_summary']['load_time'] = array(
+     '#markup' => '<b>Date:</b> '.$load_time,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['file_size'] = array(
+     '#markup' => '<b>File Size:</b> '.$file_size. ' KB',
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['rows_in_file'] = array(
+     '#markup' => '<b>Records in File:</b> '.$rows_in_file,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['rows_imported'] = array(
+     '#markup' => '<b>Records Imported:</b> '.$rows_imported,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['connect_error'] = array(
+     '#markup' => '<b>Connect Error:</b> '.$connect_error,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['database_error'] = array(
+     '#markup' => '<b>Database Error:</b> '.$database_error,
+     '#prefix' => '<p>',
+     '#suffix' => '</p></td>',
+  );
+
+  $form['fs_summary']['no_file_error'] = array(
+     '#markup' => '<b>File Missing Error:</b> '.$no_file_error,
+     '#prefix' => '<td><p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['file_open_error'] = array(
+     '#markup' => '<b>File Open Error:</b> '.$file_open_error,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['file_empty_error'] = array(
+     '#markup' => '<b>File Empty Error:</b> '.$file_empty_error,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['import_update_error'] = array(
+     '#markup' => '<b>Update Error:</b> '.$import_update_error,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['empty_table_error'] = array(
+     '#markup' => '<b>Empty Table Error:</b> '.$empty_table_error,
+     '#prefix' => '<p>',
+     '#suffix' => '</p>',
+  );
+
+  $form['fs_summary']['number_of_row_errors'] = array(
+     '#markup' => '<b>Records with an Error:</b> '.$number_of_row_errors,
+     '#prefix' => '<p>',
+     '#suffix' => '</p></td></tr></table>',
+  );
+
+  $form['fs_error_details'] = array(
+     '#type' => 'fieldset',
+     '#title' => t('Record Error Details'),
+  );
+
+  $form['fs_error_details']['row_error_report'] = array(
+     '#type' => 'markup',
+     '#markup' => drupal_render(delivery_error_details_table_chillicothe($import_id)),
+  );
+
+  $form['fs_comments'] = array(
+     '#type' => 'fieldset',
+     '#title' => t('Comments'),
+  );
+
+  $form['fs_comments']['comments'] = array(
+     '#type' => 'textarea',
+     '#description' => t('Please enter any comments associated with this import.'),
+     '#maxlength' => 19999,
+     '#required' => False,
+     '#default_value' => $comments,
+   );
+
+   $form['submit'] = array(
+     '#type' => 'submit',
+     '#value' => t('Save Comments'),
+   );
+
+   $form['go_back_button'] = array(
+     '#type' => 'markup',
+     '#markup' => '<a href="http://supplierscorecard.company_x.com/delivery_import_report_display_ch"><input type="button" class="form-submit" value="Go Back"></input></a>',
+   );
+
+   return $form;
+}
+
+//***mill_y displays a list of the delivery row errors in a dapper little table
+function delivery_error_details_table_chillicothe($import_id) {
+
+  //Configure the table header columns
+  $header = array(
+    array('data' => 'Record'),
+    array('data' => 'Error'),
+  );
+
+  //Set the database table and initial SelectQuery options
+   $select = db_select('company_x_delivery_error_detail_ch', 'g_unit')
+      ->condition('id', $import_id)
+      ->extend('PagerDefault')
+      ->extend('TableSort');
+
+  //Get the desired fields
+    $select ->fields('g_unit', array('id', 'row_error', 'row_number'))
+      ->limit(10)
+      ->orderByHeader($header)
+      ->orderBy('row_number', 'ASC');
+
+  //Execute the query
+  $results = $select->execute();
+
+  //Configure the table rows
+  $rows = array();
+  foreach ($results as $row) {
+     $rows[] = array(
+        $row->row_number,
+        $row->row_error,
+     );
+  }
+
+  $render_delivery_details['table'] = array(
+		'#theme' => 'table',
+		'#rows' => $rows,
+		'#empty' => 'No errors to report',
+		'#header' => $header,
+  );
+
+  $render_delivery_details['pager'] = array(
+		'#theme' => 'pager',
+	);
+
+  return $render_delivery_details;
+}
+
+//***mill_y submit function for delivery import details
+function delivery_import_details_chillicothe_form_submit($form, &$form_state) {
+
+  //Im grabbing the values from the form here
+  $comments = $form_state['values']['comments'];
+  $import_id = $form_state['storage']['import_id'];
+
+  //Update the values in the company_x_delivery_log table
+  $comments_updated = db_update('company_x_delivery_log_ch')
+     ->fields(array(
+        'comments' => $comments))
+     ->condition('id', $import_id, '=')
+     ->execute();
+
+  //Message after form is submitted
+  $message = "The comments have been successfully updated";
+  drupal_set_message($message, $type = 'status', $repeat = TRUE); // status, warning, error are types
+}
+
+//MONEY BAGS SECURITY
+function company_x_import_module_permission() {
+    return array(
+       'QCA Import Administration Access' => array(
+       'title' => t('QCA Import Administration Access'),
+       'description' => t('Allows users to access Import Administration.'),
+       ),
+
+       'QCA Import Control Panel Access' => array(
+       'title' => t('QCA Import Control Panel Access'),
+       'description' => t('Allows users to access the Import Control Panel.'),
+       ),
+
+       'QCA mill_x Reports Access' => array(
+       'title' => t('QCA mill_x Reports Access'),
+       'description' => t('Allows users to access the mill_x Reports.'),
+       ),
+    );
+}

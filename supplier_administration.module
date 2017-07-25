@@ -1,0 +1,2617 @@
+<?php
+
+function supplier_administration_menu() {
+  $items = array();
+
+  //mill_x supplier provisional report
+  $items['supplier_provisional_report'] = array(
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('supplier_provisional_report_form'),
+    'title' => 'Supplier Provisional Report',
+    'access callback' => 'user_access',
+    'access arguments' => array('QCA Provisional Supplier Report Access'),
+  );
+
+  //Supplier administration list
+  $items['supplier_administration_list'] = array(
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('supplier_administration_list_form',1,2,3,4), //$filter_mill, $filter_supplier, $filter_provisional, $filter_approved
+    'title' => 'Supplier Administration List',
+    'access callback' => 'user_access',
+    'access arguments' => array('QCA Supplier Administration List Access'),
+  );
+
+  //New Supplier list
+  $items['new_supplier_administration_list'] = array(
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('new_supplier_administration_list_form',1,2,3,4), //$filter_mill, $filter_supplier, $filter_provisional, $filter_approved),
+    'title' => 'New Supplier List',
+    'access callback' => 'user_access',
+    'access arguments' => array('QCA New Supplier Administration List Access'),
+  );
+
+//    $items['supplier_administration_list_2'] = array(
+//    'page callback' => 'drupal_get_form',
+//    'page arguments' => array('supplier_administration_list_2_form'),
+//    'title' => 'Supplier Administration List 2',
+//    'access callback' => 'user_access',
+//    'access arguments' => array('QCA Supplier Administration List 2 Access'),
+//  );
+
+  //Supplier Relationship Form
+  $items['supplier_relationship'] = array(
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('create_supplier_relationship_form'),
+    'title' => t('Relate Suppliers'),
+    'access callback' => 'user_access',
+    'access arguments' => array('QCA Supplier Relationship Access'),
+  );
+
+  //List of Supplier Relationships
+  $items['supplier_relationship_list'] = array(
+    'title' => 'Supplier Relationships',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('supplier_relationship_list_form'),
+    'access callback' => 'user_access',
+    'access arguments' => array('QCA Supplier Relationship List Access'),
+  );
+
+  //Supplier administration form
+  $items['supplier_administration'] = array(
+    'title' => t('Supplier Administration'),
+    'type' => MENU_NORMAL_ITEM,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('supplier_administration_form',1,2,3,4,5,6,7), //$supplier_id, $source, $filter_mill, $filter_supplier, $filter_provisional, $filter_approved, $filter_due_category
+    'access callback' => 'user_access',
+    'access arguments' => array('QCA Supplier Administration Form Access'),
+   );
+
+  $items['supplier_administration/related_supplier/edit/add/%'] = array(  //% are place holders for values that will be passed in the link making the call
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('add_supplier_to_relationship_form',4),
+    'access callback' => TRUE,
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['supplier_administration/related_supplier/edit/remove/%/%'] = array(  //% are place holders for values that will be passed in the link making the call
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('remove_supplier_from_relationship_form',4,5),
+    'access callback' => TRUE,
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['supplier_administration/related_supplier/delete/%'] = array(//% are place holders for values that will be passed in the link making the call
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('delete_supplier_relationship_form',3),
+    'access callback' => TRUE,
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
+}
+
+//*************************************************************************************
+//******************* START OF Supplier Provisional Report ****************************
+//*************************************************************************************
+
+//***Display supplier provisional report
+function supplier_provisional_report_form($form, &$form_state)
+{
+
+    //form moves to the handler
+    $form = supplier_provisional_handler($form, $form_state);
+
+     //This is where we render our report
+    $form['supplier_status_report'] = array(
+    '#type' => 'markup',
+    '#markup' => drupal_render(supplier_provisional_data($form, $form_state)),
+    '#prefix' => '<div style="clear:both; id="supplier_status_report">',
+    '#suffix' => '</div>',
+    );
+
+    return $form;
+}
+
+function supplier_provisional_handler($form, $form_state){
+
+    //Criteria wrapper
+    $form['type_criteria_wrapper_open'] = array(
+    '#markup' => '<div id="criteria_wrapper" class="no-print">',
+    );
+
+    //get the supplier types from the database
+    $supplier_types = array('Select'=>'- Select -','All' => 'All') + get_supplier_types();
+
+    //if the supplier type is set, keep it displayed
+    if(isset($_SESSION['status_type']['search_type'])){
+        $default_type = $_SESSION['status_type']['search_type'];
+    }
+    else{
+        $default_type = 'Select';
+    }
+
+    //supplier type ALL checkbox.  set the default to All as checked
+    $form['supplier_type'] = array(
+    '#type' => 'select',
+    '#title' => t('Supplier Type'),
+    '#prefix' => '<div id="type_select_supplier">',
+    '#suffix' => '</div>',
+    '#options' => $supplier_types,
+    '#default_value' => $supplier_types[$default_type],
+    );
+
+    //Criteria supplier type and submit container to make 3 columns
+    $form['criteria_supplier_type_submit_container'] = array(
+    '#markup' => '<div id="type_submit_container">',
+    );
+
+    $form['type_submit'] = array(
+    '#type' => 'submit',
+    '#prefix' => '<div id="type_submit">',
+    '#suffix' => '',
+    '#value' => t('Generate Report'),
+    '#name' => 'generate_supplier_type', //name button to determine which was clicked
+     );
+
+    //Call function that exports data to csv file
+    $form['export_to_csv_provisional'] = array(
+    '#type' => 'image_button',
+    '#prefix' => '<div class="type_csv_download_icon">',
+    '#suffix' => '</div>',
+    '#src' => '/images/csv_download_icon.png',
+    '#submit' => array('export_to_csv_provisional'),
+    );
+
+    //Close the criteria wrapper and the year/submit container
+    $form['type_criteria_wrapper_closed'] = array(
+    '#markup' => '</div></div></div>',
+    );
+
+    return $form;
+}
+
+function supplier_provisional_report_form_submit($form, &$form_state)
+{
+	//when the submit is pressed, the form is processed with the data in the supplier_type_all
+	$_SESSION['status_type'] = array('search_type'=>$form_state['input']['supplier_type']);
+}
+
+//Generate supplier provisional report
+function supplier_provisional_data($form, &$form_state)
+{
+    $selected_type = $_SESSION['status_type']['search_type'];
+
+    //set the header literal values and the associated fields
+    $header = array(
+        'vendor' => array('data'=>t('Vendor'),'field'=>'vendor'),
+        'vendor_name' => array('data'=>t('Vendor Name'),'field'=>'vendor_name'),
+        'approved_status' => array('data'=>t('Approved'),'field'=>'approved_status'),
+        'provisional_status'=>array('data'=>t('Provisional'),'field'=>'provisional_status'),
+    );
+
+    # set the database table
+    $query = db_select('company_x_supplier_maintenance', 'g');
+
+    $query = $query->extend('PagerDefault')->extend('TableSort');  //add the page navigation
+    $query->limit(25); //limit output to 25 rows in the page navigation
+    $query = $query->extend('TableSort'); //for sorting
+    $query->fields('g', array(
+        'id',
+        'vendor',
+        'vendor_name',
+        'approved_status',
+        'provisional_status',
+    ));//add semi-colon so if statements can be added
+
+    if($selected_type == 'Approved' ){
+        $query->condition('approved_status', "YES");
+    }
+    if($selected_type == 'Provisional'){
+        $query->condition('provisional_status', "YES");
+    }
+    //add orderByHeader to create header sort in table
+    $query->orderByHeader($header);
+
+    # execute the query
+    $results = $query->execute();
+
+    # build the table data
+    $rows = array();
+
+    //load the data in the $rows array
+    foreach ($results as $row)
+    {
+        $rows[] = array(
+                $row->vendor,
+                $row->vendor_name,
+                $row->approved_status,
+                $row->provisional_status,
+                );
+        //drupal_set_message('<pre>'. print_r($row->weight_of_po, true) .'</pre>');
+    }
+
+    $build['table'] = array(
+    '#theme' => 'table',
+    '#rows' => $rows,
+    '#header' => $header,
+    '#empty' => 'Empty List - No Entries'
+    );
+
+    $build['pager'] =array(
+    '#theme' => 'pager');
+
+    return $build;
+
+
+}
+
+//Export supplier provisional report
+function export_to_csv_provisional($form, &$form_state)
+{
+    //***********************************DB VARIABLES***************************************************
+    //database connection for company_x Supplier Evaluation Application
+    //TEST DB VARIABLES
+//    $databasehost = "localhost";
+//    $databasename = "company_x";
+//    $databaseusername ="glatuser";
+//    $databasepassword = "Glat#79924";
+
+    //PRODUCTION DB VARIABLES
+    $databasehost = "naprdscore01.intglt.com";
+    $databasename = "company_x";
+    $databaseusername ="glatuser";
+    $databasepassword = "Glat#79924";
+    //****************************************************************************************************
+    $mysqli = new mysqli($databasehost,$databaseusername,$databasepassword,$databasename);
+
+    $selected_type = $form_state['values']['supplier_type'];
+
+
+    //returns the appropriate excel data based on the selection in the supplier type select list
+    if($selected_type == 'Approved' ){
+        $csv_results = $mysqli->query("SELECT vendor, vendor_name, approved_status, provisional_status FROM company_x_supplier_maintenance WHERE approved_status ='YES'");
+    }
+
+    elseif($selected_type == 'Provisional' ){
+        $csv_results = $mysqli->query("SELECT vendor, vendor_name, approved_status, provisional_status FROM company_x_supplier_maintenance WHERE provisional_status ='YES'");
+    }
+    else {
+        $csv_results = $mysqli->query("SELECT vendor, vendor_name, approved_status, provisional_status FROM company_x_supplier_maintenance");
+    }
+    //work with the result set object and map it to an array
+    $csv_data = array();
+    while ($rows = $csv_results->fetch_object()) {
+        $csv_data[] = array(
+            $rows->vendor,
+            $rows->vendor_name,
+            $rows->approved_status,
+            $rows->provisional_status,
+        );
+    }
+    //drupal_set_message('<pre>'. print_r($csv_data, true) .'</pre>');
+
+    function map_colnames($input){
+        //******$colnames will need to be customized to each data set that is getting exported********
+        $colnames = array(
+          '0' => "Vendor",
+          '1' => "Vendor Name",
+          '2' => "Approved Status",
+          '3'=> "Provisional Status",
+      );
+
+      return isset($colnames[$input]) ? $colnames[$input] : $input;
+    }
+
+    function cleanData(&$str){
+      if($str == 't') $str = 'TRUE';
+      if($str == 'f') $str = 'FALSE';
+      if(strstr($str, '"')) $str = '"' . str_replace('"', '""', $str) . '"';
+    }
+
+    // filename for download
+    $filename = "provisional_data_" . date('Ymd') . ".csv";
+
+    header("Content-Disposition: attachment; filename=\"$filename\"");
+    header("Content-Type: text/csv");
+
+    $out = fopen("php://output", 'w');
+
+    $flag = false;
+    foreach($csv_data as $row) {
+        if(!$flag) {
+                // display field/column names as first row
+                $firstline = array_map("map_colnames", array_keys($row));
+                fputcsv($out, $firstline, ',', '"');
+                $flag = true;
+            }
+        array_walk($row, 'cleanData');
+        fputcsv($out, array_values($row), ',', '"');
+    }
+
+    fclose($out);
+    $csv_results->close();
+    $mysqli->close();
+    exit;
+}
+//*************************************************************************************
+//********************* END OF Supplier Provisional Report ****************************
+//*************************************************************************************
+
+
+
+
+//*********************************************************************
+//*                     SUPPLIER ADMINISTRATION LIST                  *
+//*********************************************************************
+
+//***Display list of suppliers
+function supplier_administration_list_form($form, &$form_state, $filter_mill, $filter_supplier, $filter_provisional, $filter_approved)
+{
+    $form_state['new_supplier_flag'] == "NO";
+
+    //new supplier report access
+    $form['supplier_administration_overview'] = array(
+     '#type' => 'fieldset',
+     '#title' => t('Overview'),
+    );
+
+    $form['supplier_administration_overview']['supplier_administration_summary'] = array(
+        '#markup' => 'The following is the complete list of suppliers contained in SEA. Click on the "edit" icon to adjust the supplier attributes. New suppliers are added to the system automatically when they are imported for the first time. ',
+    );
+
+    $form['supplier_administration_overview']['new_suppliers_link'] = array(
+         '#markup' => '<a id="new_suppliers_link" href="/new_supplier_administration_list/' . $supplier_admin_list_mill . '/' . $supplier_admin_list_supplier . '/' . $supplier_admin_list_provisional . '/' . $supplier_admin_list_approved . '">View New Suppliers</a>',
+    );
+
+
+
+    //Filters! Filters! Filters!
+
+    //If it is the first pass, then grab the user mill from their profile and use it as the defaul
+    //OR use the one passed in from wherever they came from
+    if($form_state['run_once'] != "Yes")
+    {
+        if (empty($filter_mill))
+        {
+            //use the user default if a mill has not been passed in
+            $supplier_admin_list_mill = get_user_mill();
+        }
+        else
+        {
+            //if one has been passed in then use it.
+            $supplier_admin_list_mill = $filter_mill;
+        }
+
+        //for the first run assign filters passed in to use as the defaults
+        $supplier_admin_list_supplier = $filter_supplier;
+        $supplier_admin_list_provisional = $filter_provisional;
+        $supplier_admin_list_approved = $filter_approved;
+    }
+
+    //Probably a better way to grab the mills (joint query maybe) but Im going to start with hardcoding them
+    $supplier_admin_list_mill_options = array('All'=>'All') + array('1001'=>'mill_x') + array('1550'=>'mill_y');
+
+    $form['supplier_admin_list_mill'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $supplier_admin_list_mill_options,
+     '#required' => FALSE,
+     '#prefix' => '<table id="general_filters_header"><tr><td width="10">Mill: </td><td width="10">',
+     '#suffix' => '</td><td width="10">Supplier: </td><td width="10">',
+     '#default_value' => $supplier_admin_list_mill,
+     '#ajax' => array(
+        'callback' =>'ajax_supplier_admin_list_callback',
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+    //If it is not the first pass, get the value from the field
+    if($form_state['run_once'] == "Yes")
+    {
+        //use the user selected mill
+        $supplier_admin_list_mill = $form_state['values']['supplier_admin_list_mill'];
+    }
+
+    $supplier_admin_list_supplier_options = array('All'=>'All') + get_supplier_names_from_maintenance_table($supplier_admin_list_mill);
+
+    $form['supplier_admin_list_supplier'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $supplier_admin_list_supplier_options,
+     '#required' => FALSE,
+     '#prefix' => '<div id="supplier_admin_list_supplier">',
+     '#suffix' => '</div>',
+     '#default_value' => $supplier_admin_list_supplier,
+     '#ajax' => array(
+        'callback' =>'ajax_supplier_admin_list_callback',
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+    //If it is not the first pass, get the value from the field
+    if($form_state['run_once'] == "Yes")
+    {
+        //use the user selected mill
+        $supplier_admin_list_supplier = $form_state['values']['supplier_admin_list_supplier'];
+    }
+
+    $supplier_admin_list_provisional_options = array('All'=>'All') + get_provisional_status_list_from_maintenance_table();
+
+    $form['supplier_admin_list_provisional'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $supplier_admin_list_provisional_options,
+     '#required' => FALSE,
+     '#prefix' => '</td><td width="10">Provisional: </td><td width="10">',
+     '#suffix' => '</td>',
+     '#default_value' => $supplier_admin_list_provisional,
+     '#ajax' => array(
+        'callback' =>'ajax_supplier_admin_list_callback',
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+    //If it is not the first pass, get the value from the field
+    if($form_state['run_once'] == "Yes")
+    {
+        //use the user selected mill
+        $supplier_admin_list_provisional = $form_state['values']['supplier_admin_list_provisional'];
+    }
+
+    $supplier_admin_list_approved_options = array('All'=>'All') + get_approved_status_list_from_maintenance_table();
+
+    $form['supplier_admin_list_approved'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $supplier_admin_list_approved_options,
+     '#required' => FALSE,
+     '#prefix' => '<td width="10">Approved: </td><td width="10">',
+     '#suffix' => '</td>',
+     '#default_value' => $supplier_admin_list_approved,
+     '#ajax' => array(
+        'callback' =>'ajax_supplier_admin_list_callback',
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+    //If it is not the first pass, get the value from the field
+    if($form_state['run_once'] == "Yes")
+    {
+        //use the user selected mill
+        $supplier_admin_list_approved = $form_state['values']['supplier_admin_list_approved'];
+    }
+
+
+    $form['export_to_csv_maintenance'] = array(
+        '#type' => 'image_button',
+        '#src' => '/images/csv_download_icon.png',
+        '#prefix' => '<td class="administration_list_export_button"><span class="beautytips grow" title="Export supplier data to a comma separated file that is viewable in Excel and can be styled for printing.">',
+        '#suffix' => '</span></td></tr></table>',
+        '#submit' => array('export_supplier_maintenance_to_csv')
+    );
+
+    //Go grab the data dude university
+    $select = db_select('company_x_supplier_maintenance', 'g_unit');
+    $select ->fields('g_unit', array(
+                'id',
+                'vendor',
+                'vendor_name',
+                'purchase_org',
+                'approved_status',
+                'approved_date',
+                'provisional_status',
+                'supplier_self_assessment',
+                'product_critical',
+                'volume_gtr_one',
+                'sole_sourced',
+                'critical_to_customer',
+                'frequency_override',
+                'idle_status',
+                'next_scorecard_override'
+                ));
+
+      //Set the conditions based on values collected from filters
+      //Mill
+      if ($supplier_admin_list_mill == "" || $supplier_admin_list_mill == "All")
+      {
+          //No filter thank you
+      }
+      else
+      {
+          $select->condition('purchase_org', $supplier_admin_list_mill);
+      }
+
+      //Supplier
+      if ($supplier_admin_list_supplier == "" || $supplier_admin_list_supplier == "All")
+      {
+          //No filter thank you
+      }
+      else
+      {
+          $select->condition('vendor', $supplier_admin_list_supplier);
+      }
+
+      //Provisional Status
+      if ($supplier_admin_list_provisional == "" || $supplier_admin_list_provisional == "All")
+      {
+          //No filter thank you
+      }
+      else
+      {
+          $select->condition('provisional_status', $supplier_admin_list_provisional);
+      }
+
+      //Approved Status
+      if ($supplier_admin_list_approved == "" || $supplier_admin_list_approved == "All")
+      {
+          //No filter thank you
+      }
+      else
+      {
+          $select->condition('approved_status', $supplier_admin_list_approved);
+      }
+
+
+    //Execute the query
+    $results = $select->execute();
+
+    //Throw the rows together
+    $rows = array();
+    foreach ($results as $row) {
+        //build override display if the supplier has a next scorecard override
+        $next_scorecard_override = $row->next_scorecard_override;
+        if ($next_scorecard_override == "Yes")
+        {
+            $next_scorecard_override_display = '<span class="beautytips" title="The scorecard due date has been overridden by a system administrator"><img style="vertical-align:middle" src="/images/warning.png">';
+        }
+        else
+        {
+            $next_scorecard_override_display = "";
+        }
+
+        $rows[] = array(
+            '<span class="beautytips grow" title="Edit the supplier attributes"><a href="/supplier_administration/' . $row->vendor . '/admin_list/' . $supplier_admin_list_mill . '/' . $supplier_admin_list_supplier . '/' . $supplier_admin_list_provisional . '/' . $supplier_admin_list_approved . '/' . $filter_due_category . '">' . '<img src="/images/form_edit.png">' . '</a></span>',
+            $row->vendor_name,
+            $row->vendor,
+            $row->purchase_org,
+            relationship_status($row->vendor),
+            $row->approved_status,
+            $row->idle_status,
+            date_display_mask($row->approved_date),
+            last_delivery_date($row->vendor, $row->purchase_org),
+            $row->provisional_status,
+            $row->supplier_self_assessment,
+            $row->product_critical,
+            $row->volume_gtr_one,
+            $row->sole_sourced,
+            $row->critical_to_customer,
+            date_display_mask(get_latest_scorecard_date($row->vendor)),
+            get_next_scorecard_date($row->vendor) . $next_scorecard_override_display,
+            get_scorecard_frequency($row->vendor),
+            $row->frequency_override,
+        );
+    }
+
+    //Table settings. This is using the datatables module which talks to the built in jQuery Datatables
+    //We can talk to jQuery's Datatables with straight javascript too, like we did with tabs
+    //but time is short people, and so am I.
+
+    $attributes['datatable_options'] = array(
+      'bFilter'   => TRUE,
+      'bInfo'     => TRUE,
+      'bAutoWidth' => TRUE,
+      'sScrollX' => TRUE,
+      'bStateSave' => TRUE,
+      'aaSorting' => array(
+                        array(1, 'asc'),
+                    ),
+    );
+
+    //Columns headers
+    $header = array(
+      array(
+        'data' => t(''),
+        'datatable_options' => array(
+          'bSortable' => FALSE,
+          'bSearchable' => FALSE,
+        ),
+      ),
+      array(
+        'data' => t('Vendor&nbsp;Name'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+//          'sWidth' => '200px',
+        ),
+      ),
+      array(
+        'data' => t('Vendor&nbsp;#'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Purchase Org'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Related'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Approved'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Idle'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Approved Date'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Last Delivery&nbsp;&nbsp;&nbsp;'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Provisional'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Self Assessment'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Product Critical'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Volume > 1/Week'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Sole Sourced'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Critical To Customer'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Last Scorecard'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Next Scorecard&nbsp;&nbsp;&nbsp;&nbsp;&nbsp'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Frequency'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Frequency Override'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+    );
+
+    // Render this mofo
+    $variables = array(
+      'attributes' => $attributes,
+      'header' => $header,
+      'rows' => $rows,
+    );
+    $output = theme('datatable', $variables);
+
+    $form['display_supplier_admin_list'] = array(
+         '#markup' => $output,
+         '#prefix' => '<div id="display_supplier_admin_list">',
+         '#suffix' => '</div>',
+        );
+
+    //Flag when the form has been run one time so we can do all sorts of cool things
+        $form_state['run_once'] = "Yes";
+    return $form;
+
+}
+
+//AJAX TIME!!!
+//Supplier Admin List - Changes made when the filters are changed
+function ajax_supplier_admin_list_callback($form, $form_state)
+{
+
+   //since we want to return multiple elements in multiple areas this array works just dandy
+   return array(
+     '#type' => 'ajax',
+     '#commands' => array(
+
+      ajax_command_replace("#display_supplier_admin_list", render($form['display_supplier_admin_list'])),
+      ajax_command_replace("#supplier_admin_list_supplier", render($form['supplier_admin_list_supplier'])),
+      ajax_command_replace("#new_suppliers_link", render($form['supplier_administration_overview']['new_suppliers_link'])),
+      )
+   );
+}
+
+//*************************************Display the new list of suppliers*****************************************////
+function new_supplier_administration_list_form($form, &$form_state, $filter_mill, $filter_supplier, $filter_provisional, $filter_approved)
+{
+    //set the new flag
+    $form_state['storage']['new_supplier_flag'] = "YES";
+
+    //new supplier report access
+    $form['new_list_overview'] = array(
+     '#type' => 'fieldset',
+     '#title' => t('Overview'),
+    );
+
+    $form['new_list_overview']['new_supplier_summary'] = array(
+    '#markup' => 'The New Supplier Report displays suppliers that are new to SEA. When suppliers are imported for the first time, they are automatically added to the system. Suppliers will remain in the new supplier list until their attributes are adjusted and saved.',
+    );
+
+    //Filters! Filters! Filters!
+
+    //If it is the first pass, then grab the user mill from their profile and use it as the default
+    if($form_state['new_run_once'] != "Yes")
+    {
+        $supplier_admin_list_mill = get_user_mill();
+    }
+
+    //Probably a better way to grab the mills (joint query maybe) but Im going to start with hardcoding them
+    $supplier_admin_list_mill_options = array('All'=>'All') + array('1001'=>'mill_x') + array('1550'=>'mill_y');
+
+    $form['supplier_admin_list_mill'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $supplier_admin_list_mill_options,
+     '#required' => FALSE,
+     '#prefix' => '<table id="general_filters_header"><tr><td width="10">Mill: </td><td width="10">',
+     '#suffix' => '</td><td width="10">Supplier: </td><td width="10">',
+     '#default_value' => $supplier_admin_list_mill,
+     '#ajax' => array(
+        'callback' =>'ajax_supplier_admin_list_callback',
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+    //If it is the first pass, then grab the user mill from their profile and use it as the default
+    if($form_state['run_once'] != "Yes")
+    {
+        $supplier_admin_list_mill = get_user_mill();
+    }
+    else
+    {
+    $supplier_admin_list_mill = $form_state['values']['supplier_admin_list_mill'];
+    }
+
+    $supplier_admin_list_supplier_options = array('All'=>'All') + get_supplier_names_from_maintenance_table($supplier_admin_list_mill);
+
+    $form['supplier_admin_list_supplier'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $supplier_admin_list_supplier_options,
+     '#required' => FALSE,
+     '#prefix' => '<div id="supplier_admin_list_supplier">',
+     '#suffix' => '</div>',
+     '#default_value' => '',
+     '#ajax' => array(
+        'callback' =>'ajax_supplier_admin_list_callback',
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+    $supplier_admin_list_provisional_options = array('All'=>'All') + get_provisional_status_list_from_maintenance_table();
+
+    $form['supplier_admin_list_provisional'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $supplier_admin_list_provisional_options,
+     '#required' => FALSE,
+     '#prefix' => '</td><td width="10">Provisional: </td><td width="10">',
+     '#suffix' => '</td>',
+     '#default_value' => '',
+     '#ajax' => array(
+        'callback' =>'ajax_supplier_admin_list_callback',
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+    $supplier_admin_list_approved_options = array('All'=>'All') + get_approved_status_list_from_maintenance_table();
+
+    $form['supplier_admin_list_approved'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $supplier_admin_list_approved_options,
+     '#required' => FALSE,
+     '#prefix' => '<td width="10">Approved: </td><td width="10">',
+     '#suffix' => '</td</tr></table>>',
+     '#default_value' => '',
+     '#ajax' => array(
+        'callback' =>'ajax_supplier_admin_list_callback',
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+//    $form['export_to_csv_maintenance'] = array(
+//        '#type' => 'image_button',
+//        '#src' => '/images/csv_download_icon.png',
+//        '#prefix' => '<td class="administration_list_export_button"><span class="beautytips grow" title="Export supplier data to a comma separated file that is viewable in Excel and can be styled for printing.">',
+//        '#suffix' => '</span></td></tr></table>',
+//        '#submit' => array('export_supplier_maintenance_to_csv')
+//    );
+
+    //Grab the criteria from the fields above and get down to business
+
+    //If it is the first pass, then grab the user mill from their profile and use it as the default
+    if($form_state['run_once'] != "Yes")
+    {
+        //do nothing and use the variable assigned above
+    }
+    else
+    {
+        $supplier_admin_list_mill = $form_state['values']['supplier_admin_list_mill'];
+    }
+
+    $supplier_admin_list_supplier = $form_state['values']['supplier_admin_list_supplier'];
+    $supplier_admin_list_provisional = $form_state['values']['supplier_admin_list_provisional'];
+    $supplier_admin_list_approved = $form_state['values']['supplier_admin_list_approved'];
+
+    //Go grab the data dude
+    $select = db_select('company_x_supplier_maintenance', 'g_unit');
+    $select ->fields('g_unit', array(
+                'id',
+                'vendor',
+                'vendor_name',
+                'purchase_org',
+                'approved_status',
+                'approved_date',
+                'provisional_status',
+                'supplier_self_assessment',
+                'product_critical',
+                'volume_gtr_one',
+                'sole_sourced',
+                'critical_to_customer',
+                'existing_supplier',
+                ));
+
+      //Set the conditions based on values collected from filters
+      //Mill
+      if ($supplier_admin_list_mill == "" || $supplier_admin_list_mill == "All")
+      {
+          //No filter thank you
+      }
+      else
+      {
+          $select->condition('purchase_org', $supplier_admin_list_mill);
+      }
+
+      //Supplier
+      if ($supplier_admin_list_supplier == "" || $supplier_admin_list_supplier == "All")
+      {
+          //No filter thank you
+      }
+      else
+      {
+          $select->condition('vendor', $supplier_admin_list_supplier);
+      }
+
+      //Provisional Status
+      if ($supplier_admin_list_provisional == "" || $supplier_admin_list_provisional == "All")
+      {
+          //No filter thank you
+      }
+      else
+      {
+          $select->condition('provisional_status', $supplier_admin_list_provisional);
+      }
+
+      //Approved Status
+      if ($supplier_admin_list_approved == "" || $supplier_admin_list_approved == "All")
+      {
+          //No filter thank you
+      }
+      else
+      {
+          $select->condition('approved_status', $supplier_admin_list_approved);
+      }
+
+      //condition to only get the new suppliers
+      $select->condition('existing_supplier', "NO","=");
+
+    //Execute the query
+    $results = $select->execute();
+
+    //Throw the rows together
+    $rows = array();
+    foreach ($results as $row) {
+        $rows[] = array(
+            '<span class="beautytips grow" title="Edit the supplier attributes"><a href="/supplier_administration/' . $row->vendor . '/new_admin_list/' . $supplier_admin_list_mill . '/' . $supplier_admin_list_supplier . '/' . $supplier_admin_list_provisional . '/' . $supplier_admin_list_approved . '/' . $filter_due_category . '">' . '<img src="/images/form_edit.png">' . '</a></span>',
+            $row->vendor_name,
+            $row->vendor,
+            $row->purchase_org,
+            relationship_status($row->vendor),
+            $row->approved_status,
+            $row->approved_date,
+            $row->provisional_status,
+            $row->supplier_self_assessment,
+            $row->product_critical,
+            $row->volume_gtr_one,
+            $row->sole_sourced,
+            $row->critical_to_customer,
+            get_scorecard_frequency($row->vendor),
+            //test on 12/14 to add display mask
+            date_display_mask(get_latest_scorecard_date($row->vendor)),
+            get_next_scorecard_date($row->vendor),
+        );
+    }
+
+    //Table settings. This is using the datatables module which talks to the built in jQuery Datatables
+    //We can talk to jQuery's Datatables with straight javascript too, like we did with tabs
+    //but time is short people, and so am I.
+
+    $attributes['datatable_options'] = array(
+      'bFilter'   => TRUE,
+      'bInfo'     => TRUE,
+      'autoWidth' => TRUE,
+      'scrollX' => TRUE,
+      'bStateSave' => TRUE,
+      'aaSorting' => array(
+                        array(1, 'asc'),
+                    ),
+    );
+
+    //Columns headers
+    $header = array(
+      array(
+        'data' => t(''),
+        'datatable_options' => array(
+          'bSortable' => FALSE,
+          'bSearchable' => FALSE,
+        ),
+      ),
+      array(
+        'data' => t('Vendor Name'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Vendor #'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Purchase Org'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Related'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Approved'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Approved Date'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Provisional'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Self Assessment'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Product Critical'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Volume > 1/Week'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Sole Sourced'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Critical To Customer'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Frequency'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Last Scorecard'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Next Scorecard'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+    );
+
+    // Render this mofo
+    $variables = array(
+      'attributes' => $attributes,
+      'header' => $header,
+      'rows' => $rows,
+    );
+    $output = theme('datatable', $variables);
+
+    $form['display_supplier_admin_list'] = array(
+         '#markup' => $output,
+         '#prefix' => '<div id="display_supplier_admin_list">',
+         '#suffix' => '</div>',
+        );
+
+   $form['new_supplier_list_back'] = array(
+         '#prefix' => '<span id="action_icon" class="beautytips grow" title="Return to the Supplier Administration List">',
+         '#markup' => '<a href="/supplier_administration_list/' . $filter_mill . '/' . $filter_supplier . '/' . $filter_provisional . '/' . $filter_approved . '">' . '<img src="/images/go_back_6.png"></a>',
+         '#suffix' => '</span></div>',
+        );
+
+    //Flag when the form has been run one time so we can do all sorts of cool things
+        $form_state['new_run_once'] = "Yes";
+    return $form;
+
+}
+
+//AJAX TIME!!!
+//New Supplier List - Changes made when the filters are changed
+function ajax_new_supplier_admin_list_callback($form, $form_state)
+{
+
+   //since we want to return multiple elements in multiple areas this array works just dandy
+   return array(
+     '#type' => 'ajax',
+     '#commands' => array(
+
+      ajax_command_replace("#display_supplier_admin_list", render($form['display_supplier_admin_list'])),
+      ajax_command_replace("#supplier_admin_list_supplier", render($form['supplier_admin_list_supplier'])),
+      )
+   );
+}
+
+
+//Supplier administration form
+function supplier_administration_form($form, &$form_state, $supplier_id, $source, $filter_mill, $filter_supplier, $filter_provisional, $filter_approved, $filter_due_category) {
+
+//Pull the report data for the specified report
+//Identify table and return desired fields
+  $query = db_select('company_x_supplier_maintenance', 'g') //db table name and alias
+    ->condition('vendor', $supplier_id)
+    ->fields('g', array(
+        'vendor',
+        'purchase_org',
+        'vendor_name',
+        'approved_status',
+        'approved_date',
+        'provisional_status',
+        'supplier_self_assessment',
+        'product_critical',
+        'volume_gtr_one',
+        'sole_sourced',
+        'critical_to_customer',
+        'frequency_override',
+        'next_scorecard_override',
+        'idle_status',
+    ));
+  $results = $query->execute();
+
+  //Cycle through the records and assign the data to variables
+  foreach ($results as $result)
+  {
+     $vendor_number = $result->vendor;
+     $purchase_org = $result->purchase_org;
+     $vendor_name = $result->vendor_name;
+     $approved_status = $result->approved_status;
+     $approved_date = $result->approved_date;
+     $provisional_status = $result->provisional_status;
+     $supplier_self_assessment = $result->supplier_self_assessment;
+     $product_critical= $result->product_critical;
+     $volume_gtr_one = $result->volume_gtr_one;
+     $sole_sourced = $result->sole_sourced;
+     $critical_to_customer = $result->critical_to_customer;
+     $last_scorecard_date = date_display_mask(get_latest_scorecard_date($vendor_number));
+     $next_scorecard_override = $result->next_scorecard_override;
+     $frequency_override = $result->frequency_override;
+     $idle_status = $result->idle_status;
+  }
+
+  //Assign the key based on the value
+  If ($approved_status == 'NO')
+  {
+      $approved_status = "0";
+  }
+
+  elseif ($approved_status == 'YES')
+  {
+      $approved_status = "1";
+  }
+
+  //Assign the provisional value based on the key selected
+   If ($provisional_status == 'NO')
+  {
+      $provisional_status = "0";
+  }
+  elseif ($provisional_status == 'YES')
+  {
+      $provisional_status = "1";
+  }
+
+    //Assign the supplier self assessment value based on the key selected
+   If ($supplier_self_assessment == 'NO')
+  {
+      $supplier_self_assessment = "0";
+  }
+  elseif ($supplier_self_assessment == 'YES')
+  {
+      $supplier_self_assessment = "1";
+  }
+
+    //Assign the key based on the value
+  If ($product_critical == 'NO')
+  {
+      $product_critical = "0";
+  }
+
+  elseif ($product_critical == 'YES')
+  {
+      $product_critical = "1";
+  }
+
+    //Assign the key based on the value
+  If ($volume_gtr_one == 'NO')
+  {
+      $volume_gtr_one = "0";
+  }
+
+  elseif ($volume_gtr_one == 'YES')
+  {
+      $volume_gtr_one = "1";
+  }
+
+    //Assign the key based on the value
+  If ($sole_sourced == 'NO')
+  {
+      $sole_sourced = "0";
+  }
+
+  elseif ($sole_sourced == 'YES')
+  {
+      $sole_sourced = "1";
+  }
+
+    //Assign the key based on the value
+  If ($critical_to_customer == 'NO')
+  {
+      $critical_to_customer = "0";
+  }
+
+  elseif ($critical_to_customer == 'YES')
+  {
+      $critical_to_customer = "1";
+  }
+
+  //Assign the frequency override key based on the value
+  if (empty($frequency_override))
+  {
+      $frequency_override = "0";
+  }
+
+  if ($frequency_override == '30')
+  {
+      $frequency_override = "1";
+  }
+
+  if ($frequency_override == '90')
+  {
+      $frequency_override = "2";
+  }
+
+  if ($frequency_override == '120')
+  {
+      $frequency_override = "3";
+  }
+
+   if ($frequency_override == '180')
+  {
+      $frequency_override = "4";
+  }
+
+  if ($frequency_override == '360')
+  {
+      $frequency_override = "5";
+  }
+
+  //Display fields
+  $form['fs_supplier_admin_summary'] = array(
+     '#type' => 'fieldset',
+     '#title' => t('Summary'),
+   );
+
+  $form['fs_supplier_admin_summary']['supplier_admin_summary'] = array(
+    '#markup' => 'The supplier administration form allows the user to adjust supplier attributes such as their provisional and approved status',
+  );
+
+  $form['open_supplier_admin_container'] = array(
+    '#markup' => '<div id="supplier_admin_container">'
+  );
+
+  $form['supplier_admin_vendor_name'] = array(
+    '#type' => 'textfield',
+    '#size' => 50,
+    '#maxlength' => 200,
+    '#prefix' => '<div class="supplier_admin_row"><div class="supplier_admin_column_1">Vendor: </div><div class="supplier_admin_column_2">',
+    '#suffix' => '</div></div>',
+    '#default_value' => $vendor_name,
+  );
+
+  $form['supplier_admin_idle_status'] = array(
+    '#type' => 'select',
+    '#title' => '',
+    '#options' => array(
+             'NO' => t('NO'),
+             'YES' => t('YES'),
+           ),
+    '#required' => FALSE,
+    '#prefix' => '<div class="supplier_admin_row"><div class="supplier_admin_column_1">Idle? </div><div class="supplier_admin_column_2">',
+    '#suffix' => '</div></div>',
+    '#default_value' => $idle_status,
+  );
+
+  if(relationship_status($supplier_id) == "NO"){
+    $form['supplier_admin_related_alias'] = array(
+      '#markup' => '<div class="supplier_admin_row"><div class="supplier_admin_column_1_text">Related: </div><div class="supplier_admin_column_2">'. "NO" .'</div></div>',
+    );
+  }//end if
+  else{
+    $form['supplier_admin_related_alias'] = array(
+      '#markup' => '<div class="supplier_admin_row"><div class="supplier_admin_column_1_text">Related: </div><div class="supplier_admin_column_2">'. "YES" .'</div></div>',
+    );
+  }//end else
+
+  $form['supplier_admin_vendor_number'] = array(
+    '#markup' => '<div class="supplier_admin_row"><div class="supplier_admin_column_1_text">Vendor Number: </div><div class="supplier_admin_column_2">'. $vendor_number .'</div></div>',
+  );
+
+
+  $form['supplier_admin_last_scorecard'] = array(
+    '#markup' => '<div class="supplier_admin_row"><div class="supplier_admin_column_1_text">Last Scorecard: </div><div class="supplier_admin_column_2">'. $last_scorecard_date .'</div></div>',
+  );
+
+  $form['supplier_admin_vendor_frequency'] = array(
+    '#markup' => '<div class="supplier_admin_row"><div class="supplier_admin_column_1_text">Current Scorecard Frequency: </div><div class="supplier_admin_column_2">'. get_scorecard_frequency($vendor_number). " Days" .'</div></div>',
+  );
+
+  $form['supplier_admin_frequency_override'] = array(
+    '#type' => 'select',
+    '#title' => '',
+    '#options' => array(
+             0 => t('None'),
+             1 => '30',
+             2 => '90',
+             3 => '120',
+             4 => '180',
+             5 => '360',
+           ),
+    '#required' => FALSE,
+    '#prefix' => '<div class="supplier_admin_row"><div class="supplier_admin_column_1">Override Frequency? </div><div class="supplier_admin_column_2">',
+    '#suffix' => '</div></div>',
+    '#default_value' => $frequency_override,
+  );
+
+    //build override display if the supplier has a next scorecard override
+    if ($next_scorecard_override == "Yes")
+    {
+        $next_scorecard_override_display = '<span class="beautytips" title="The scorecard due date has been overridden by a system administrator"><img style="vertical-align:middle" src="/images/warning.png">';
+    }
+    else
+    {
+        $next_scorecard_override_display = "";
+    }
+
+  $form['supplier_admin_next_scorecard'] = array(
+    '#markup' => '<div class="supplier_admin_row"><div class="supplier_admin_column_1_text">Next Scorecard: </div><div class="supplier_admin_column_2">'. get_next_scorecard_date($vendor_number) . $next_scorecard_override_display . '</div></div>',
+  );
+
+  $form['supplier_admin_last_delivery'] = array(
+    '#markup' => '<div class="supplier_admin_row"><div class="supplier_admin_column_1_text">Last Delivery: </div><div class="supplier_admin_column_2">'. last_delivery_date($vendor_number, $purchase_org) .'</div></div>',
+  );
+
+  $form['supplier_admin_approved_status'] = array(
+    '#type' => 'select',
+    '#title' => '',
+    '#options' => array(
+             0 => t('NO'),
+             1 => t('YES'),
+           ),
+    '#required' => FALSE,
+    '#prefix' => '<div class="supplier_admin_row"><div class="supplier_admin_column_1">Approved? </div><div class="supplier_admin_column_2">',
+    '#suffix' => '</div></div>',
+    '#default_value' => $approved_status,
+  );
+
+  $form['supplier_admin_approved_date'] = array(
+    '#type' => 'date_popup',
+    '#date_label_position' => 'none',
+    '#date_format' => 'm/d/Y',
+    '#default_value' => $approved_date,
+    '#prefix' => '<div class="supplier_admin_row"><div class="supplier_admin_column_1">Approved Date? </div><div class="supplier_admin_column_2">',
+    '#suffix' => '</div></div>',
+  );
+
+  $form['supplier_admin_provisional_status'] = array(
+    '#type' => 'select',
+    '#title' => '',
+    '#options' => array(
+             0 => t('NO'),
+             1 => t('YES'),
+           ),
+    '#required' => FALSE,
+    '#prefix' => '<div class="supplier_admin_row"><div class="supplier_admin_column_1">Provisional? </div><div class="supplier_admin_column_2">',
+    '#suffix' => '</div></div>',
+    '#default_value' => $provisional_status,
+  );
+
+ $form['supplier_self_assessment_status'] = array(
+    '#type' => 'select',
+    '#title' => '',
+    '#options' => array(
+             0 => t('NO'),
+             1 => t('YES'),
+           ),
+    '#required' => FALSE,
+    '#prefix' => '<div class="supplier_admin_row"><div class="supplier_admin_column_1">Self Assessment? </div><div class="supplier_admin_column_2">',
+    '#suffix' => '</div></div>',
+    '#default_value' => $supplier_self_assessment,
+  );
+
+  $form['supplier_admin_product_critical'] = array(
+    '#type' => 'select',
+    '#title' => '',
+    '#options' => array(
+             0 => t('NO'),
+             1 => t('YES'),
+           ),
+    '#required' => FALSE,
+    '#prefix' => '<div class="supplier_admin_row"><div class="supplier_admin_column_1">Product Critical? </div><div class="supplier_admin_column_2">',
+    '#suffix' => '</div></div>',
+    '#default_value' => $product_critical,
+  );
+
+  $form['supplier_admin_volume_gtr_one'] = array(
+    '#type' => 'select',
+    '#title' => '',
+    '#options' => array(
+             0 => t('NO'),
+             1 => t('YES'),
+           ),
+    '#required' => FALSE,
+    '#prefix' => '<div class="supplier_admin_row"><div class="supplier_admin_column_1">Volume > 1/Week? </div><div class="supplier_admin_column_2">',
+    '#suffix' => '</div></div>',
+    '#default_value' => $volume_gtr_one,
+  );
+
+  $form['supplier_admin_sole_sourced'] = array(
+    '#type' => 'select',
+    '#title' => '',
+    '#options' => array(
+             0 => t('NO'),
+             1 => t('YES'),
+           ),
+    '#required' => FALSE,
+    '#prefix' => '<div class="supplier_admin_row"><div class="supplier_admin_column_1">Sole Sourced? </div><div class="supplier_admin_column_2">',
+    '#suffix' => '</div></div>',
+    '#default_value' => $sole_sourced,
+  );
+
+  $form['supplier_admin_critical_to_customer'] = array(
+    '#type' => 'select',
+    '#title' => '',
+    '#options' => array(
+             0 => t('NO'),
+             1 => t('YES'),
+           ),
+    '#required' => FALSE,
+    '#prefix' => '<div class="supplier_admin_row"><div class="supplier_admin_column_1">Critical To Customer? </div><div class="supplier_admin_column_2">',
+    '#suffix' => '</div></div>',
+    '#default_value' => $critical_to_customer,
+  );
+
+  $form['close_supplier_admin_container'] = array(
+    '#markup' => '</div>',
+  );
+
+  $form['submit'] = array(
+     '#type' => 'image_button',
+     '#src' => '/images/save3.png',
+     '#prefix' => '<div class="general_bottom_divider"><span id="general_action_icon" class="beautytips grow" title="Save the Supplier Attributes">',
+     '#suffix' => '</span>',
+   );
+   //The back button destination depends on where this form was generated from
+  //Generated from the scorecard due report
+  If ($source == "scorecards_due")
+  {
+
+   $form['back_to_scorecards_due'] = array(
+         '#prefix' => '<span id="action_icon" class="beautytips grow" title="Return to the Scorecards Due Report">',
+         '#markup' => '<a href="/scorecards_due_report/' . $filter_due_category . '/' . $filter_mill . '">' . '<img src="/images/go_back_6.png"></a>',
+         '#suffix' => '</span></div>',
+        );
+  }
+
+  If ($source == "admin_list")
+  {
+        $form['back_to_supplier_list'] = array(
+         '#prefix' => '<span id="action_icon" class="beautytips grow" title="Return to the List of Suppliers">',
+         '#markup' => '<a href="/supplier_administration_list/' . $filter_mill . '/' . $filter_supplier . '/' . $filter_provisional . '/' . $filter_approved . '">' . '<img src="/images/go_back_6.png"></a>',
+         '#suffix' => '</span></div>',
+        );
+  }
+
+  If ($source == "new_admin_list")
+  {
+
+   $form['back_to_new_supplier_list'] = array(
+         '#prefix' => '<span id="action_icon" class="beautytips grow" title="Return to the List of New Suppliers">',
+         '#markup' => '<a href="/new_supplier_administration_list/' . $filter_mill . '/' . $filter_supplier . '/' . $filter_provisional . '/' . $filter_approved . '">' . '<img src="/images/go_back_6.png"></a>',
+         '#suffix' => '</span></div>',
+        );
+  }
+
+    //set a form element equal to the supplier id and where it was called from so it can be used throughout the form
+    //specifically in the submit handler
+    $form_state['storage']['supplier_id'] = $supplier_id;
+    $form_state['storage']['source'] = $source;
+    $form_state['storage']['filter_mill'] = $filter_mill;
+    $form_state['storage']['filter_supplier'] = $filter_supplier;
+    $form_state['storage']['filter_provisional'] = $filter_provisional;
+    $form_state['storage']['filter_approved'] = $filter_approved;
+    $form_state['storage']['filter_due_category'] = $filter_due_category;
+
+   return $form;
+}//end supplier administation form
+
+
+//***Submit function for supplier administration form
+function supplier_administration_form_submit($form, &$form_state) {
+
+    //Get the filters passed in so after save the user can still navigate back
+    $filter_mill = $form_state['storage']['filter_mill'];
+    $filter_supplier = $form_state['storage']['filter_supplier'];
+    $filter_provisional = $form_state['storage']['filter_provisional'];
+    $filter_approved = $form_state['storage']['filter_approved'];
+    $filter_due_category = $form_state['storage']['filter_due_category'];
+
+  //Im grabbing the values from the form here
+  $supplier_id = $form_state['storage']['supplier_id'];
+  $source = $form_state['storage']['source'];
+  $supplier_name = $form_state['values']['supplier_admin_vendor_name'];
+  $approved_status = $form_state['values']['supplier_admin_approved_status'];
+  $approved_date = $form_state['values']['supplier_admin_approved_date'];
+  $provisional_status = $form_state['values']['supplier_admin_provisional_status'];
+  $supplier_self_assessment = $form_state['values']['supplier_self_assessment_status'];
+  $product_critical = $form_state['values']['supplier_admin_product_critical'];
+  $volume_gtr_one = $form_state['values']['supplier_admin_volume_gtr_one'];
+  $sole_sourced = $form_state['values']['supplier_admin_sole_sourced'];
+  $critical_to_customer = $form_state['values']['supplier_admin_critical_to_customer'];
+  $frequency_override = $form_state['values']['supplier_admin_frequency_override'];
+  $idle_status = $form_state['values']['supplier_admin_idle_status'];
+
+  //Assign the approved value based on the key selected
+  If ($approved_status == '0')
+  {
+      $approved_status = "NO";
+  }
+
+  elseif ($approved_status == '1')
+  {
+      $approved_status = "YES";
+  }
+
+  //Assign the provisional value based on the key selected
+   If ($provisional_status == '0')
+  {
+      $provisional_status = "NO";
+  }
+  elseif ($provisional_status == '1')
+  {
+      $provisional_status = "YES";
+  }
+
+  //Assign the provisional value based on the key selected
+   If ($supplier_self_assessment == '0')
+  {
+      $supplier_self_assessment = "NO";
+  }
+  elseif ($supplier_self_assessment == '1')
+  {
+      $supplier_self_assessment = "YES";
+  }
+
+  //Assign the product_critical value based on the key selected
+   If ($product_critical == '0')
+  {
+      $product_critical = "NO";
+  }
+  elseif ($product_critical == '1')
+  {
+      $product_critical = "YES";
+  }
+
+  //Assign the volume_gtr_one value based on the key selected
+   If ($volume_gtr_one == '0')
+  {
+      $volume_gtr_one = "NO";
+  }
+  elseif ($volume_gtr_one == '1')
+  {
+      $volume_gtr_one = "YES";
+  }
+
+  //Assign the sole_sourced value based on the key selected
+   If ($sole_sourced == '0')
+  {
+      $sole_sourced = "NO";
+  }
+  elseif ($sole_sourced == '1')
+  {
+      $sole_sourced = "YES";
+  }
+
+  //Assign the critical_to_customer value based on the key selected
+   If ($critical_to_customer == '0')
+  {
+      $critical_to_customer = "NO";
+  }
+  elseif ($critical_to_customer == '1')
+  {
+      $critical_to_customer = "YES";
+  }
+
+ //Assign the frequency_override value based on the key selected
+    if ($frequency_override == '0')
+  {
+      $frequency_override = null;
+  }
+
+  if ($frequency_override == '1')
+  {
+      $frequency_override = '30';
+  }
+
+  if ($frequency_override == '2')
+  {
+      $frequency_override = '90';
+  }
+
+  if ($frequency_override == '3')
+  {
+      $frequency_override = '120';
+  }
+
+  if ($frequency_override == '4')
+  {
+      $frequency_override = '180';
+  }
+
+  if ($frequency_override == '5')
+  {
+      $frequency_override = '360';
+  }
+
+
+  //Update the values in the company_x_supplier_maintenance table
+  $status_updated = db_update('company_x_supplier_maintenance')
+     ->fields(array(
+             'vendor_name'=> $supplier_name,
+             'approved_status' => $approved_status,
+             'approved_date' => $approved_date,
+             'provisional_status' => $provisional_status,
+             'supplier_self_assessment' => $supplier_self_assessment,
+             'product_critical' => $product_critical,
+             'volume_gtr_one' => $volume_gtr_one,
+             'sole_sourced' => $sole_sourced,
+             'critical_to_customer' => $critical_to_customer,
+             'frequency_override' => $frequency_override,
+             'idle_status' => $idle_status,
+             //when a supplier is updated it is no longer new and shiny, but an old veteran
+             'existing_supplier' => "YES",
+             ))
+     ->condition('vendor', $supplier_id, '=')
+     ->execute();
+
+  //Message after form is submitted
+
+  If ($source == "scorecards_due")
+  {
+      $message = "The supplier attributes have been successfully updated" .
+      '&nbsp; &nbsp; &nbsp; <span class="beautytips" title="Return to the Scorecards Due Report"><a href="/scorecards_due_report/' . $filter_due_category . '/' . $filter_mill . '">' . '<img style="vertical-align:middle" src="/images/go_back_save.png"></span></a>';
+  }
+
+  If ($source == "admin_list")
+  {
+      $message = "The supplier attributes have been successfully updated" .
+      '&nbsp; &nbsp; &nbsp; <span class="beautytips" title="Return to the List of Suppliers"><a href="/supplier_administration_list/' . $filter_mill . '/' . $filter_supplier . '/' . $filter_provisional . '/' . $filter_approved . '">' . '<img style="vertical-align:middle" src="/images/go_back_save.png"></span></a>';
+  }
+
+  If ($source == "new_admin_list")
+  {
+      $message = "The supplier attributes have been successfully updated" .
+      '&nbsp; &nbsp; &nbsp; <span class="beautytips" title="Return to the List of New Suppliers"><a href="/new_supplier_administration_list/' . $filter_mill . '/' . $filter_supplier . '/' . $filter_provisional . '/' . $filter_approved . '">' . '<img style="vertical-align:middle" src="/images/go_back_save.png"></span></a>';
+  }
+
+  drupal_set_message($message, $type = 'status', $repeat = TRUE); // status, warning, error are types
+
+  drupal_goto('supplier_administration/'.$supplier_id .'/'. $source .'/'. $filter_mill .'/'. $filter_supplier .'/'. $filter_provisional .'/'. $filter_approved .'/'. $filter_due_category);
+}//end supplier administation form submit
+
+
+//***********************************EXPORT SUPPLIER MAINENANCE TO CSV****************************************
+function export_supplier_maintenance_to_csv($form, &$form_state)
+{
+    //base where clause to build from if filters are not on ALL
+    $where_clause = "'"."1"."'";
+
+    //add mill to where clause
+    $csv_supplier_admin_list_mill = $form_state['values']['supplier_admin_list_mill'];
+    if($csv_supplier_admin_list_mill == "1001"){
+        $query_mill = "1001";
+        $where_clause .= " AND purchase_org = '".$query_mill."'";
+    }
+    if($csv_supplier_admin_list_mill == "1550"){
+        $query_mill = "1550";
+        $where_clause .= " AND purchase_org = '".$query_mill."'";
+    }
+
+    //add the supplier to the where clause
+    $csv_supplier_admin_list_supplier = $form_state['values']['supplier_admin_list_supplier'];
+    if($csv_supplier_admin_list_supplier != "All"){
+        $query_supplier = $csv_supplier_admin_list_supplier;
+        $where_clause .= " AND vendor = '".$query_supplier."'";
+    }
+
+
+    //add provisional status to where clause
+    $csv_supplier_admin_list_provisional = $form_state['values']['supplier_admin_list_provisional'];
+    if($csv_supplier_admin_list_provisional == "NO"){
+        $query_provisonal = "NO";
+        $where_clause .= " AND provisional_status = '".$query_provisonal."'";
+    }
+    if($csv_supplier_admin_list_provisional == "YES"){
+        $query_provisonal = "YES";
+        $where_clause .= " AND provisional_status = '".$query_provisonal."'";
+    }
+
+    //add approved status to where clause
+    $csv_supplier_admin_list_approved = $form_state['values']['supplier_admin_list_approved'];
+    if($csv_supplier_admin_list_approved == "NO"){
+        $query_approved = "NO";
+        $where_clause .= " AND approved_status = '".$query_approved."'";
+    }
+    if($csv_supplier_admin_list_approved == "YES"){
+        $query_approved = "YES";
+        $where_clause .= " AND approved_status = '".$query_approved."'";
+    }
+
+
+    //***********************************DB VARIABLES***************************************************
+    //database connection for company_x Supplier Evaluation Application
+    //TEST DB VARIABLES
+    $databasehost = "localhost";
+    $databasename = "company_x";
+    $databaseusername ="glatuser";
+    $databasepassword = "Glat#79924";
+
+    //PRODUCTION DB VARIABLES
+//    $databasehost = "naprdscore01.intglt.com";
+//    $databasename = "company_x";
+//    $databaseusername ="glatuser";
+//    $databasepassword = "Glat#79924";
+    //****************************************************************************************************
+    $mysqli = new mysqli($databasehost,$databaseusername,$databasepassword,$databasename);
+
+    $csv_query = "SELECT purchase_org, vendor,"
+            . "vendor_name, approved_status, approved_date, provisional_status,"
+            . "supplier_self_assessment, product_critical, volume_gtr_one, sole_sourced,"
+            . "critical_to_customer, supplier_email,next_scorecard_override,"
+            . "'fequency' as placeholder, 'next_scorecard_date,' as placeholder, frequency_override, idle_status "
+            . "FROM company_x_supplier_maintenance WHERE ". $where_clause;
+
+
+    $csv_results = $mysqli->query($csv_query);
+    //$csv_results = $mysqli->query( "CALL delivery_csv($csv_query)" );
+
+    //work with the result set object and map it to an array
+    $csv_data = array();
+    while ($rows = $csv_results->fetch_object()) {
+        $csv_data[] = array(
+            $rows->purchase_org,
+            //$rows->sea_id,
+            $rows->relationship = relationship_status($rows->vendor),
+            $rows->vendor,
+            $rows->vendor_name,
+            $rows->approved_status,
+            $rows->idle_status,
+            $rows->approved_date,
+            $rows->last_delivery = last_delivery_date($rows->vendor, $rows->purchase_org),
+            $rows->provisional_status,
+            $rows->supplier_self_assessment,
+            $rows->product_critical,
+            $rows->volume_gtr_one,
+            $rows->sole_sourced,
+            $rows->critical_to_customer,
+            $rows->last_scorecard_date = get_latest_scorecard_date($rows->vendor),
+            $rows->next_scorecard_date = get_next_scorecard_date($rows->vendor),
+            $rows->next_scorecard_override,
+            $rows->frequency = get_scorecard_frequency($rows->vendor),
+            $rows->frequency_override,
+            $rows->supplier_email,
+        );
+    }
+
+    //drupal_set_message('<pre>'. print_r($csv_data, true) .'</pre>');
+
+    function map_colnames($input){
+        //******$colnames will need to be customized to each data set that is getting exported********
+        $colnames = array(
+          '0' => "Purchase Org",
+          //'1' => "SEA ID",
+          '1' => "Related",
+          '2'=> "Vendor",
+          '3'=> "Vendor Name",
+          '4'=> "Approved Status",
+          '5'=> "Idle Status",
+          '6'=> "Approved Date",
+          '7'=> "Last Delivery",
+          '8'=> "Provisional Status",
+          '9'=> "Supplier Self Assessment",
+          '10'=> "Critical to Process",
+          '11'=> "Volume Greater One/Week",
+          '12'=> "Sole Sourced",
+          '13'=> "Critical to Cust.",
+          '14'=> "Last Scorecard",
+          '15'=> "Next Scorecard",
+          '16'=> "Next Scorecard Override",
+          '17'=> "Frequency",
+          '18'=> "Frequency Override",
+          '19'=> "Supplier Email",
+      );
+
+      return isset($colnames[$input]) ? $colnames[$input] : $input;
+    }
+
+    function cleanData(&$str){
+      if($str == 't') $str = 'TRUE';
+      if($str == 'f') $str = 'FALSE';
+      if(strstr($str, '"')) $str = '"' . str_replace('"', '""', $str) . '"';
+    }
+
+    // filename for download
+    $filename = "supplier_administration_data_" . date('Ymd') . ".csv";
+
+    header("Content-Disposition: attachment; filename=\"$filename\"");
+    header("Content-Type: text/csv");
+
+    $out = fopen("php://output", 'w');
+
+    $flag = false;
+    foreach($csv_data as $row) {
+        if(!$flag) {
+                // display field/column names as first row
+                $firstline = array_map("map_colnames", array_keys($row));
+                fputcsv($out, $firstline, ',', '"');
+                $flag = true;
+            }
+        array_walk($row, 'cleanData');
+        fputcsv($out, array_values($row), ',', '"');
+    }
+
+    fclose($out);
+    $csv_results->close();
+    $mysqli->close();
+    exit;
+}
+
+//***********************************END EXPORT SUPPLIER MAINENANCE TO CSV************************************
+
+
+//************************************************************************************************************
+//***************************************SUPPLIER RELATIONSHIP FORM*******************************************
+//************************************************************************************************************
+function create_supplier_relationship_form($form, &$form_state) {
+
+  $form['create'] = array(
+    '#type' => 'fieldset',
+  );
+
+  $form['create']['description_create'] = array(
+    '#markup' => '<div>' . t('Relationships can be created below between two or more suppliers.  Suppliers in a Relationship will be treated as a single supplier for reporting and Scorecard purposes.') .'</div>',
+  );
+
+  $form['supplier_alias'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Relationship Alias'),
+    '#size' => 40,
+    '#maxlength' => 40,
+    //'#element_validate' => array('relationship_alias_validate'),
+  );
+
+   //Grab the suppliers from the maintenance table
+   $relate_supplier_options = array('Select'=>'-Select-') + get_supplier_names_from_maintenance_table_key_number();
+
+   //If its a new beginning, and Freddy is back, start at 2
+   if (empty($form_state['num_suppliers'])) {
+    $form_state['num_suppliers'] = 2;
+  }
+
+   //Loop through and build stuff, but try not to break it
+   for ($i = 0; $i < $form_state['num_suppliers']; $i++) {
+
+       $form['relate_supplier_' . $i] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $relate_supplier_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="link_supplier_row"><div class="link_supplier_column_1">Supplier: </div><div class="link_supplier_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => '',
+         //ajax callback information
+         '#ajax' => array(
+            'callback' =>'ajax_relate_supplier_info_callback',
+            //'callback' =>'supplier_add_remove_callback',//callback tag
+            'wrapper' => 'relate_supplier_number_' . $i, //wrapper id
+            //'wrapper' => 'supplier-fieldset-wrapper',
+            'method' => 'replace',
+            'effect' => 'none',
+         ),
+       );
+
+       //get the supplier id based on the name
+       $relate_supplier_number = $form_state['values']['relate_supplier_' . $i];
+
+       //variables to hold the related supplier information to reference in the confirmation message
+       $form_state['suppliers_to_relate_number'.$i] = $relate_supplier_number;
+       $form_state['suppliers_to_relate_name'.$i] = get_supplier_name_from_maintenance_table($relate_supplier_number);
+
+   }//end for loop that is building all the goods
+
+   //Add a supplier
+   $form['add_supplier'] = array(
+    '#type' => 'image_button',
+    '#src' => '/images/plus_icon.png',
+    '#submit' => array('add_one_more_supplier'),
+    '#prefix' => '<div class="link_buttons_container><div class="link_buttons_row"><div class="link_buttons_add"><span class="beautytips grow" title="Add an additional supplier to your new relationship">',
+    '#suffix' => '</span></div>',
+  );
+
+   //Remove a supplier
+  if ($form_state['num_suppliers'] > 1) {
+    $form['remove_supplier'] = array(
+      '#type' => 'image_button',
+      '#src' => '/images/minus_icon.png',
+      '#submit' => array('remove_one_more_supplier'),
+      '#prefix' => '<div class="link_buttons_remove"><span class="beautytips grow" title="Remove a supplier from your new relationship">',
+      '#suffix' => '</span></div>',
+    );
+  }
+
+  $form['submit'] = array(
+    '#type' => 'image_button',
+    '#src' => '/images/link.png',
+    '#submit' => array('relate_suppliers'),
+    '#prefix' => '<div class="link_buttons_link"><span class="beautytips grow" title="Link the above suppliers to create a new relationship">',
+    '#suffix' => '</span></div>',
+    '#name' => 'relate',
+  );
+
+  $form['return_to_relationship_list'] = array(
+    '#type' => 'image_button',
+    '#src' => '/images/go_back_small.png',
+    '#submit' => array('return_to_supplier_relationship_list'),
+    '#prefix' => '<div class="link_buttons_link"><span class="beautytips grow" title="Return to the list of relationships">',
+    '#suffix' => '</span></div></div></div>',
+  );
+
+  return $form;
+}//end create supplier relationship form
+
+function add_one_more_supplier($form, &$form_state) {
+  $form_state['num_suppliers']++;
+  $form_state['rebuild'] = TRUE;
+}
+
+function remove_one_more_supplier($form, &$form_state) {
+  if ($form_state['num_suppliers'] > 1) {
+    $form_state['num_suppliers']--;
+  }
+  $form_state['rebuild'] = TRUE;
+}
+
+function relate_suppliers($form, &$form_state){
+    //add relationship alias to the glt related supplier table
+    $new_relationship_alias = strtoupper(check_plain($form_state['values']['supplier_alias']));
+    $insert_alias_query = db_insert('company_x_supplier_relationship')
+    ->fields(array(
+        'sea_relationship_alias' => $new_relationship_alias,
+        ))
+    ->execute();
+
+    //get the id associated with the new relationship alias
+    $new_related_id_query = db_select('company_x_supplier_relationship','g')
+    ->condition('g.sea_relationship_alias', $new_relationship_alias, "=")
+    ->fields('g',array('sea_id'));
+    $id_results = $new_related_id_query->execute();
+
+    $rows = array();
+    foreach($id_results as $row){
+        $rows[] = $row->sea_id;
+    }
+    $relationship_id = $rows[0];
+
+    //number of suppliers in the relationship
+    $number_of_suppliers = $form_state['num_suppliers'];
+
+    for ($i = 0; $i < $number_of_suppliers; $i++){
+        //set the supplier number to be updated
+        $supplier_number_relate = $form_state['suppliers_to_relate_number'.$i];
+        //update the supplier maintenance table with sea id and sea alias
+        $insert_related_suppliers = db_insert('company_x_related_suppliers')
+        //->condition('vendor',$supplier_number_relate,"=")
+        ->fields(array(
+            'vendor' => $supplier_number_relate,
+            'sea_id' => $relationship_id,
+            ))
+        ->execute();
+
+    }//end for loop that is updating the supplier maintnence table
+
+
+     $message = "The following suppliers " ;
+     for($i = 0; $i < $number_of_suppliers; $i++){
+         $message .= $form_state['suppliers_to_relate_name'.$i] . " - " . $form_state['suppliers_to_relate_number'.$i] . ", ";
+     }
+     $message .= " have been related.";
+     drupal_set_message($message, $type = 'status', $repeat = TRUE); // status, warning, error are types
+
+
+}//end relate suppliers function
+
+function delete_supplier_relationship_confirmed ($form, &$form_state){
+    $deleted_id = $form_state['relationship_id_being_edited'];
+
+    //get all the related suppliers that belong to the relationship that needs to be deleted
+    $get_related_suppliers_query = db_select('company_x_related_suppliers','g');
+    $get_related_suppliers_query->fields('g',array(
+            'vendor',
+            ));
+    $get_related_suppliers_query->condition('g.sea_id',$deleted_id,'=');
+    $related_suppliers_results = $get_related_suppliers_query->execute();
+
+
+    foreach($related_suppliers_results as $record){
+    //delete the suppliers from the company_x supplier relationship table
+    $delete_related_supplier_query = db_delete('company_x_related_suppliers')
+        ->condition('sea_id',$deleted_id,'=')
+        ->execute();
+    }
+
+
+    //delete the relationship from the relationship table
+    $delete_relationship_query = db_delete('company_x_supplier_relationship')
+        ->condition('sea_id',$deleted_id,'=')
+        ->execute();
+
+    $message = "The suppliers have been unrelated and the Relationship has been deleted.";
+    drupal_set_message($message, $type = 'status', $repeat = TRUE); // status, warning, error are types
+
+
+}
+
+function return_to_supplier_relationship($form, &$form_state){
+    drupal_goto('supplier_relationship');
+}
+
+function return_to_supplier_relationship_list($form, &$form_state){
+    drupal_goto('supplier_relationship_list');
+}
+
+function add_supplier_to_relationship_form($form, &$form_state, $relationship_id){
+
+    drupal_add_js();
+    //$form_state['relationship_id_to_delete'] = $relationship_id;
+    $form_state['relationship_id_being_edited'] = $relationship_id;
+
+    //get the name associated with the relationship alias
+    $related_name_query = db_select('company_x_supplier_relationship','g')
+    ->condition('g.sea_id', $relationship_id, "=")
+    ->fields('g',array('sea_relationship_alias'));
+    $name_results = $related_name_query->execute();
+
+    $rows = array();
+    foreach($name_results as $row){
+        $rows[] = $row->sea_relationship_alias;
+    }
+    $relationship_name = $rows[0];
+
+    $form_state['relationship_name_being_edited'] = $relationship_name;
+
+    $form['add_supplier'] = array(
+    '#type' => 'fieldset',
+    );
+
+    $form['add_supplier']['description_add'] = array(
+    '#markup' => '<div>' . t('Current suppliers in the ' . $relationship_name . ' relationship.') .'</div>',
+    );
+
+
+    //set the header literal values and the associated fields
+    $header = array(
+        'edit'=>array('data'=>t('')),
+        'vendor_name'=>array('data'=>t('Supplier Name'),'field'=>'vendor_name'),
+        'vendor'=>array('data'=>t('Supplier Number'),'field'=>'vendor'),
+        'purchase_org'=>array('data'=>t('Mill'),'field'=>'purchase_org'),
+    );
+
+    # set the database table
+    $query_suppliers_in_relationship = db_select('company_x_supplier_maintenance', 'g');
+    //add the join statement.  Joins cannot be chained so they need to have the semi-tutor-colon.
+    $query_suppliers_in_relationship->join('company_x_related_suppliers','r','r.vendor = g.vendor');
+    //fields to be used in the display
+    $query_suppliers_in_relationship->fields('g', array(
+        'vendor_name',
+        'vendor',
+        'purchase_org',
+    ));//add semi-colon so if statements can be added
+
+    //add condition where the r.sea_id is the relationship id that was passed
+    $query_suppliers_in_relationship->condition('r.sea_id',$relationship_id,'=');
+
+    # execute the query
+    $results = $query_suppliers_in_relationship->execute();
+
+    # build the table data
+    $rows = array();
+    //load the data in the $rows array
+    foreach ($results as $row)
+    {
+        $rows[] = array(
+            '<span class="beautytips grow" title="Remove the supplier from the relationship"><a href="/supplier_administration/related_supplier/edit/remove/' . $row->vendor .'/'. $relationship_id . '">' . '<img src="/images/unlink.png">' . '</a></span>',
+            //l(t('Unrelate Supplier'), 'supplier_administration/related_supplier/edit/remove/' . $row->vendor .'/'. $relationship_id)
+            $row->vendor_name,
+            $row->vendor,
+            $row->purchase_org,
+         );
+        //drupal_set_message('<pre>'. print_r($row->weight_of_po, true) .'</pre>');
+    }
+
+
+    $output = theme('table', array('header' => $header,
+    'rows' => $rows ));
+
+    # add the pager
+    $output .= theme('pager');
+
+    //display the suppliers in the relationship in a table
+    $form['add_suppliers_relationship'] = array(
+    '#type' => 'markup',
+    '#markup' => $output,
+    '#prefix' => '<div style="clear:both">',
+    '#suffix' => '</div>',
+    );
+
+    //Grab the suppliers from the maintenance table
+    $add_supplier_options = array('Select'=>'-Select-') + get_supplier_names_from_maintenance_table_key_number();
+
+    $form['supplier_to_add'] = array(
+    '#type' => 'select',
+    '#title' => '',
+    '#options' => $add_supplier_options,
+    '#required' => FALSE,
+    '#prefix' => '<table><tr><td width="110px">Supplier to Add: </td><td width="5px">',
+    '#suffix' => '</td>',
+    '#default_value' => '',
+    );
+
+    $form_state['id_supplier_to_add'] = $form_state['input']['supplier_to_add'];
+
+   //Add a supplier
+   $form['add_submit'] = array(
+    '#type' => 'image_button',
+    '#src' => '/images/plus_icon.png',
+    '#submit' => array('add_new_supplier_to_relationship'),
+    '#prefix' => '<td><span class="beautytips grow" title="Add the selected supplier to the relationship">',
+    '#suffix' => '</span></td></tr></table>',
+    '#name' => 'add_to_relationship',
+  );
+
+   //Delete relationship
+   $form['delete_submit'] = array(
+      '#type' => 'image_button',
+      '#src' => '/images/trash_can_delete_32x32.png',
+      '#submit' => array('delete_supplier_relationship_confirmed'),
+      '#prefix' => '<div class="edit_relationship_buttons_container><div class="edit_relationship_buttons_row"><div class="edit_relationship_buttons_delete"><span class="beautytips grow" title="Delete the relationship and return the suppliers listed above to an independent status.">',
+      '#suffix' => '</span></div>',
+      '#attributes' => array('onclick' => 'if(!confirm("Are you sure you would like to delete this relationship?")){return false;}'),
+    );
+
+  $form['add_cancel'] = array(
+    '#type' => 'image_button',
+    '#src' => '/images/go_back_6.png',
+    '#submit' => array('return_to_supplier_relationship_list'),
+    '#prefix' => '<div class="edit_relationship_buttons_return"><span class="beautytips grow" title="Return to the list of relationships">',
+    '#suffix' => '</span></div></div></div>',
+  );
+
+    return $form;
+}
+
+function add_to_relationship_cancel(){
+    drupal_goto('supplier_relationship');
+}
+
+function add_new_supplier_to_relationship($form, &$form_state){
+
+    $edited_relationship_id = $form_state['relationship_id_being_edited'];
+    $edited_relationship_name = $form_state['relationship_name_being_edited'];
+
+    $supplier_number_add = $form_state['id_supplier_to_add'];
+
+    $update_related_suppliers = db_insert('company_x_related_suppliers')
+    //->condition('vendor',$supplier_number_add,"=")
+    ->fields(array(
+        'vendor' => $supplier_number_add,
+        'sea_id' => $edited_relationship_id,
+        ))
+    ->execute();
+
+    $message = "The supplier " . $supplier_number_add . " has been added to the relationship " . $edited_relationship_name;
+    drupal_set_message($message, $type = 'status', $repeat = TRUE); // status, warning, error are types
+
+    drupal_goto('supplier_administration/related_supplier/edit/add/' . $edited_relationship_id );
+
+}
+
+function remove_supplier_from_relationship_form($form, &$form_state,$supplier_id, $relationship_id){
+
+    $related_name_query = db_select('company_x_supplier_relationship','g')
+    ->condition('g.sea_id', $relationship_id, "=")
+    ->fields('g',array('sea_relationship_alias'));
+    $name_results = $related_name_query->execute();
+
+    $rows = array();
+    foreach($name_results as $row){
+        $rows[] = $row->sea_relationship_alias;
+    }
+    $relationship_name = $rows[0];
+
+    //validate there are more than one supplier
+    $result = db_select('company_x_related_suppliers', 'g')
+            ->fields('g',array('vendor'))
+            ->condition('sea_id', $relationship_id, '=');
+            //->execute();
+    $num_of_results = $result->countQuery()->execute()->fetchField();
+
+    if($num_of_results <= 1){
+        $supplier_count_error = "There is only one Supplier in the Relationship.  The final supplier cannot be deleted.  Please"
+            . " delete the relationship or add additional suppliers.".$num_of_results;
+        form_set_error('form',t($supplier_count_error));
+        drupal_goto('supplier_administration/related_supplier/edit/add/'.$relationship_id);
+    }
+    else{
+        $remove_related_supplier_query = db_delete('company_x_related_suppliers')
+            ->condition('vendor',$supplier_id,'=')
+            ->execute();
+
+        $message = "The supplier " . $supplier_id . " has been removed from the relationship " . $relationship_name;
+        drupal_set_message($message, $type = 'status', $repeat = TRUE); // status, warning, error are types
+
+        drupal_goto('supplier_administration/related_supplier/edit/add/'.$relationship_id);
+   }
+}
+
+
+//**AJAX funtion to show updated supplier information on the screen
+function ajax_relate_supplier_info_callback($form, $form_state)
+{
+   //Grab the number of measures which all calculations are based on
+   $number_of_suppliers = $form_state['num_suppliers'];
+
+   //Using this structure to package the array lets it be dynamic and loop through to add multiple
+   //commands that can all be sent back at once
+   $commands = array();
+   for ($i = 0; $i < $number_of_suppliers; $i++) {
+       $commands[] = ajax_command_replace("#relate_supplier_number_" .$i, render($form['relate_supplier_number_' . $i]));
+   }//end for loop that is building the dynamic ajax array
+
+   return array('#type' => 'ajax', '#commands' => $commands);
+}
+
+//**************************************************************************************
+//******                    Relationship Validation                                 ****
+//**************************************************************************************
+
+function add_supplier_to_relationship_form_validate($form, &$form_state){
+    //validate a supplier has been selected
+    $check_supplier_selected = $form_state['id_supplier_to_add'];
+    $supplier_selected_error = "There has not been a Supplier selected.  Please select a Supplier to add to the Relationship.";
+    if(!is_numeric($check_supplier_selected) && $form_state['triggering_element']['#name'] == 'add_to_relationship'){
+            form_set_error('supplier_to_add',t($supplier_selected_error));
+    }
+
+    $sea_id = $form_state['relationship_id_being_edited'];
+    //drupal_set_message('<pre>'. print_r($sea_id, true) .'</pre>');
+
+
+    //validate suppliers are not already in the existing relationship
+    $check_supplier_number = $form_state['id_supplier_to_add'];
+    $result_supplier_number_query = db_select('company_x_related_suppliers', 'g')
+        ->fields('g',array('vendor'))
+        ->condition('g.vendor',$check_supplier_number,'=')
+        ->condition('g.sea_id',$sea_id,'=')
+        ->execute();
+        $supplier_check_results = $result_supplier_number_query->rowCount();
+    $supplier_check_error = "Supplier " . $check_supplier_number . " is already in the Relationship.";
+    if($supplier_check_results > 0 && $form_state['triggering_element']['#name'] == 'add_to_relationship'){
+        form_set_error('suppliers_to_relate_number'.$i,t($supplier_check_error));
+    }
+}
+
+function create_supplier_relationship_form_validate($form, &$form_state){
+    //sets the number of suppliers to be used in the validations below
+    $number_of_suppliers = $form_state['num_suppliers'];
+
+    //validate that the alias name is complete
+    $relationship_alias = $form_state['values']['supplier_alias'];
+    $relationship_alias_error = "Please enter a value for the Relationship Alias.";
+    if(empty($relationship_alias)&& $form_state['triggering_element']['#name'] == 'relate'){
+        form_set_error('supplier_alias',t($relationship_alias_error));
+    }
+
+    //validate that alias does not exist
+    $result_alias_duplicate_query = db_select('company_x_supplier_relationship', 'g')
+            ->fields('g',array('sea_relationship_alias'))
+            ->condition('sea_relationship_alias',$relationship_alias,'=')
+            ->execute();
+    $duplicate_results = $result_alias_duplicate_query->rowCount();
+    $duplicate_alias_error = "Relationship Alias already exists, please enter a unique Relationship Alias.";
+    if($duplicate_results > 0 && $form_state['triggering_element']['#name'] == 'relate'){
+        form_set_error('supplier_alias',t($duplicate_alias_error));
+    }
+
+//    //validate suppliers are not already in the existing relationship
+//    for ($i=0; $i < $number_of_suppliers; $i++){
+//        $check_supplier_number = $form_state['suppliers_to_relate_number'.$i];
+//        $result_supplier_number_query = db_select('company_x_supplier_relationship', 'r')
+//            ->fields('r',array('sea_relationship_alias'))
+//            ->condition('r.vendor',$check_supplier_number,'=')
+//            ->condition('r.sea_id',$sea_id_result,'=');
+//            //->execute();
+//            $supplier_check_results = $result_supplier_number_query->execute()->fetchField();
+//        //drupal_set_message('<pre>'. print_r($result_supplier_number_query, true) .'</pre>');
+//        //$supplier_check_results = $result_supplier_number_query->rowCount();
+//        $supplier_check_error = "Supplier " . $check_supplier_number . " is already in this Relationship ".$supplier_check_results. " .";
+//        if(!is_null($supplier_check_results) && $form_state['triggering_element']['#name'] == 'relate'){
+//            form_set_error('suppliers_to_relate_number'.$i,t($supplier_check_error));
+//        }
+//    }
+
+    //validate there are more than one supplier selected
+
+    $supplier_count_error = "There is only one Supplier selected.  Please add Suppliers to the Relationship.";
+    if($number_of_suppliers < 2 && $form_state['triggering_element']['#name'] == 'relate'){
+            form_set_error('relate_supplier_' . $i,t($supplier_count_error));
+    }
+
+    //validate all supplier dropdowns are selected
+    for ($i=0; $i < $number_of_suppliers; $i++){
+    $check_supplier_name = $form_state['suppliers_to_relate_name'.$i];
+
+    $supplier_name_check_error = "A Supplier field has not been filled in.  Please select a Supplier or delete the unused field.";
+        if(empty($check_supplier_name)&& $form_state['triggering_element']['#name'] == 'relate'){
+            form_set_error('relate_supplier_' . $i,t($supplier_name_check_error));
+        }
+    }
+}
+
+//************************************************************************************************************
+//*********************************END SUPPLIER RELATIONSHIP FORM*********************************************
+//************************************************************************************************************
+
+//*****************************************************************************************
+//*******                                                                           *******
+//*******                     SUPPLIER RELATIONSHIP LIST STUFF                      *******
+//*******                                                                           *******
+//*****************************************************************************************
+
+function supplier_relationship_list_form ($form, &$form_state) {
+
+    //Filters time
+    $relationship_list_options = array('All'=>'All') + get_alias_list_from_relationship_table();
+
+    $form['relationship_list_alias'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $relationship_list_options,
+     '#required' => FALSE,
+     '#prefix' => '<table id="relationship_list_header"><tr><td width="115">Relationship Alias: </td><td width="10">',
+     '#suffix' => '</td>',
+     '#default_value' => '',
+     '#ajax' => array(
+        'callback' =>'ajax_relationship_list_callback', //callback tag
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+    $form['create_new_relationship'] = array(
+        '#type' => 'image_button',
+        '#src' => '/images/plus_icon.png',
+        '#prefix' => '<td class="relationship_list_new_button"><span class="beautytips grow" title="Create a new relationship">',
+        '#suffix' => '</span></td></tr></table>',
+        '#submit' => array('create_new_relationship'), //call function
+     );
+
+      //Grab the criteria from the filters above and get down to business
+      $relationship_id = $form_state['values']['relationship_list_alias'];
+
+      //Set the database table and initial SelectQuery options
+      $select = db_select('company_x_supplier_relationship', 'g_unit');
+      $select ->fields('g_unit', array('sea_id', 'sea_relationship_alias'));
+
+              //Set the conditions based on values collected from filters
+              //Alias
+              if ($relationship_id == "" || $relationship_id == "All")
+              {
+                  //No filter thank you
+              }
+              else
+              {
+                  $select->condition('sea_id', $relationship_id);
+              }
+
+      //Execute the query
+      $results = $select->execute();
+
+      //Configure the table rows, making the first column a link to view the details
+      $rows = array();
+      foreach ($results as $row) {
+            $rows[] = array(
+                '<span class="beautytips grow" title="Edit the relationship"><a href="/supplier_administration/related_supplier/edit/add/' . $row->sea_id . '">' . '<img src="/images/form_edit.png">' . '</a></span>',
+                $row->sea_relationship_alias,
+            );
+        }
+
+        //Table settings. This is using the datatables module which talks to the built in jQuery Datatables
+        //We can talk to jQuery's Datatables with straight javascript too, like we did with tabs
+        //but time is short people, and so am I.
+
+        $attributes['datatable_options'] = array(
+          'bFilter'   => TRUE,
+          'bInfo'     => TRUE,
+          'autoWidth' => TRUE,
+          'scrollX' => TRUE,
+        );
+
+        //Columns headers
+        $header = array(
+          array(
+            'data' => t(''),
+            'datatable_options' => array(
+              'bSortable' => FALSE,
+              'bSearchable' => FALSE,
+             ),
+          ),
+          array(
+            'data' => t('Relationship Alias'),
+            'datatable_options' => array(
+              'bSortable' => TRUE,
+              'bSearchable' => TRUE,
+            ),
+          ),
+        );
+
+        // Render this mofo
+        $variables = array(
+          'attributes' => $attributes,
+          'header' => $header,
+          'rows' => $rows,
+        );
+
+        $output = theme('datatable', $variables);
+
+        $form['display_relationship_list'] = array(
+             '#markup' => $output,
+             '#prefix' => '<div id="display_relationship_list">',
+             '#suffix' => '</div>',
+            );
+
+        return $form;
+
+}
+
+function create_new_relationship(){
+    drupal_goto('supplier_relationship');
+}
+
+//SAC List AJAX - Changes made when the SAC type field is changed
+function ajax_relationship_list_callback($form, $form_state)
+{
+   //since we want to return multiple elements in multiple areas this array works just dandy
+   return array(
+     '#type' => 'ajax',
+     '#commands' => array(
+
+      ajax_command_replace("#display_relationship_list", render($form['display_relationship_list'])),
+      )
+   );
+}
+
+function supplier_administration_permission() {
+    return array(
+       'QCA Provisional Supplier Report Access' => array(
+       'title' => t('QCA Provisional Supplier Report Access'),
+       'description' => t('Allows users to access the Provisional Supplier Report.')),
+
+       'QCA Supplier Administration Form Access' => array(
+       'title' => t('QCA Supplier Administration Form Access'),
+       'description' => t('Allows users to access the supplier administration form.')),
+
+       'QCA Supplier Administration List Access' => array(
+       'title' => t('QCA Supplier Administration List Access'),
+       'description' => t('Allows users to access the supplier administration list.')),
+
+       'QCA New Supplier Administration List Access' => array(
+       'title' => t('QCA New Supplier Administration List Access'),
+       'description' => t('Allows users to access the new supplier list.')),
+
+       'QCA Supplier Relationship Access' => array(
+       'title' => t('QCA Supplier Relationship Access'),
+       'description' => t('Allows users to access the Supplier Relationship form.')),
+
+       'QCA Supplier Relationship List Access' => array(
+       'title' => t('QCA Supplier Relationship List Access'),
+       'description' => t('Allows users to access the QCA Supplier Relationship List.')),
+    );
+}
+

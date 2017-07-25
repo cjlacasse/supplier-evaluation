@@ -1,0 +1,4740 @@
+<?php
+
+function form_scorecard_menu()
+{
+    $items = array();
+
+    //Scorecard Generation
+    $items['company_x_forms/form_scorecard'] = array(
+        'title' => 'Scorecard',
+        'description' => 'Edit Scorecard',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('form_scorecard_form',2,3,4,5,6,7,8,9,10), //$scorecard_id, $supplier_selected, $supplier_year_selected, $source, $after_submit, $filter_due_category, $filter_mill, $filter_supplier, $filter_year
+        'access callback' => 'user_access',
+        'access arguments' => array('QCA Scorecard Access'),
+    );
+
+    //The Scorecard list for both mills
+    $items['scorecard_list'] = array(
+        'title' => 'Scorecard List',
+        'description' => 'Scorecard List',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('scorecard_list',1,2,3), //$filter_mill, $filter_supplier, $filter_year
+        'access callback' => 'user_access',
+        'access arguments' => array('QCA Scorecard List Access'),
+    );
+
+    //Scorecard delete confirmation
+    $items['scorecard_delete_confirmation'] = array(
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('scorecard_delete_confirmation',1,2,3,4), //$scorecard_id, $filter_mill, $filter_supplier, $filter_year
+        'title' => 'Confirm Delete',
+        'access callback' => TRUE,
+        'access arguments' => array('QCA Scorecard Confirm Delete Access'),
+    );
+
+    return $items;
+}//end of menu function
+
+//****************************************************************************************************************
+//***********                                                                                          ***********
+//***********                                                                                          ***********
+//***********                       SCORECARD THE NEXT GENERATION STUFF                                ***********
+//***********                                                                                          ***********
+//***********                                                                                          ***********
+//****************************************************************************************************************
+
+function form_scorecard_form($form, &$form_state, $scorecard_id, $supplier_selected, $supplier_year_selected, $source, $after_submit, $filter_due_category, $filter_mill, $filter_supplier, $filter_year)
+{
+
+    //if $scorecard_id is not empty, then the form exists. Set the variable so it can be
+    //used to make tough decisions about what needs to take place throughout this journey.
+    if(!empty($scorecard_id))
+    {
+        $existing_scorecard = "yes";
+    }
+
+    //If the scorecard exists, title it accordingly and pull the data based on the scorecard id passed in
+    if($existing_scorecard == "yes")
+    {
+        //set the title to view existing scorecards
+        drupal_set_title($title = "View Scorecard", $output = CHECK_PLAIN);
+
+        $query = db_select('company_x_scorecards', 'g')
+                    ->condition('id', $scorecard_id)
+                    ->fields('g', array(
+                        mill,
+                        supplier_number,
+                        supplier_name,
+                        supplier_year,
+                        is_this_a_relationship,
+                        approved_status_answer,
+                        provisional_status_answer,
+                        scorecard_start_date,
+                        scorecard_end_date,
+                        //Quality GPA
+                        quality_gpa_score,
+                        quality_gpa_color,
+                        quality_total_number_pos,
+                        quality_total_approved_pos,
+                        quality_sum_scars,
+                        quality_sum_scars_closed,
+                        //Delivery GPA
+                        delivery_gpa_score,
+                        delivery_gpa_color,
+                        delivery_total_number_pos,
+                        //Service GPA
+                        service_gpa_score,
+                        service_gpa_color,
+                        service_total_score,
+                        service_total_max_score,
+                        packing_slip_discrepancies_total,
+                        //Performance Metrics
+                        //Months
+                        previous_month_1_text,
+                        previous_month_2_text,
+                        previous_month_3_text,
+                        previous_month_0_text,
+                        //Titles
+                        performance_metric_1,
+                        performance_metric_2,
+                        performance_metric_3,
+                        performance_metric_4,
+                        performance_metric_5,
+                        performance_metric_6,
+                        performance_metric_7,
+                        //Benchmarks
+                        benchmark_score_1,
+                        benchmark_score_2,
+                        benchmark_score_3,
+                        benchmark_score_4,
+                        benchmark_score_5,
+                        benchmark_score_6,
+                        benchmark_score_7,
+                        //Goals
+                        goal_score_1,
+                        goal_score_2,
+                        goal_score_3,
+                        goal_score_4,
+                        goal_score_5,
+                        goal_score_6,
+                        goal_score_7,
+                        //Status Metric 1
+                        status_metric_1_fy,
+                        status_metric_1_month_1,
+                        status_metric_1_month_2,
+                        status_metric_1_month_3,
+                        //Status Metric 2
+                        status_metric_2_fy,
+                        status_metric_2_month_1,
+                        status_metric_2_month_2,
+                        status_metric_2_month_3,
+                        //Status Metric 3
+                        status_metric_3_fy,
+                        status_metric_3_month_1,
+                        status_metric_3_month_2,
+                        status_metric_3_month_3,
+                        //Status Metric 4
+                        status_metric_4_fy,
+                        status_metric_4_month_1,
+                        status_metric_4_month_2,
+                        status_metric_4_month_3,
+                        //Status Metric 5
+                        status_metric_5_fy,
+                        status_metric_5_month_1,
+                        status_metric_5_month_2,
+                        status_metric_5_month_3,
+                        //Status Metric 6
+                        status_metric_6_fy,
+                        status_metric_6_month_1,
+                        status_metric_6_month_2,
+                        status_metric_6_month_3,
+                        //Status Metric 7
+                        status_metric_7_fy,
+                        status_metric_7_month_1,
+                        status_metric_7_month_2,
+                        status_metric_7_month_3,
+                        //Trend Metric 1
+                        trend_metric_1_fy,
+                        trend_metric_1_month_1,
+                        trend_metric_1_month_2,
+                        trend_metric_1_month_3,
+                        //Trend Metric 2
+                        trend_metric_2_fy,
+                        trend_metric_2_month_1,
+                        trend_metric_2_month_2,
+                        trend_metric_2_month_3,
+                        //Trend Metric 3
+                        trend_metric_3_fy,
+                        trend_metric_3_month_1,
+                        trend_metric_3_month_2,
+                        trend_metric_3_month_3,
+                        //Trend Metric 4
+                        trend_metric_4_fy,
+                        trend_metric_4_month_1,
+                        trend_metric_4_month_2,
+                        trend_metric_4_month_3,
+                        //Trend Metric 1
+                        trend_metric_5_fy,
+                        trend_metric_5_month_1,
+                        trend_metric_5_month_2,
+                        trend_metric_5_month_3,
+                        //Trend Metric 1
+                        trend_metric_6_fy,
+                        trend_metric_6_month_1,
+                        trend_metric_6_month_2,
+                        trend_metric_6_month_3,
+                        //Trend Metric 1
+                        trend_metric_7_fy,
+                        trend_metric_7_month_1,
+                        trend_metric_7_month_2,
+                        trend_metric_7_month_3,
+                        //Quality COA in specification scores
+                        quality_coa_in_specification,
+                        quality_coa_in_specification_month_1,
+                        quality_coa_in_specification_month_2,
+                        quality_coa_in_specification_month_3,
+                        //Scars scores
+                        quality_scars_issued_per_month,
+                        quality_sum_scars_month_1,
+                        quality_sum_scars_month_2,
+                        quality_sum_scars_month_3,
+                        //Delivery on time scores
+                        delivery_on_time,
+                        delivery_on_time_month_1,
+                        delivery_on_time_month_2,
+                        delivery_on_time_month_3,
+                        //Quality COA on time
+                        quality_coa_on_time,
+                        quality_coa_on_time_month_1,
+                        quality_coa_on_time_month_2,
+                        quality_coa_on_time_month_3,
+                        //Quality SCARS closure rate
+                        quality_scars_closure_rate,
+                        quality_scars_closure_rate_month_1,
+                        quality_scars_closure_rate_month_2,
+                        quality_scars_closure_rate_month_3,
+                        //Service rating scores
+                        service_rating,
+                        service_rating_month_1,
+                        service_rating_month_2,
+                        service_rating_month_3,
+                        //Packing slip accuracy scores
+                        packing_slip_accuracy,
+                        packing_slip_accuracy_month_1,
+                        packing_slip_accuracy_month_2,
+                        packing_slip_accuracy_month_3,
+                        //Service Assessment Questions
+                        question_1,
+                        question_2,
+                        question_3,
+                        question_4,
+                        question_5,
+                        question_6,
+                        question_7,
+                        question_8,
+                        //Service Assessment Measures
+                        measure_1,
+                        measure_2,
+                        measure_3,
+                        measure_4,
+                        measure_5,
+                        measure_6,
+                        measure_7,
+                        measure_8,
+                        //Service Assessment Scores
+                        score_1,
+                        score_2,
+                        score_3,
+                        score_4,
+                        score_5,
+                        score_6,
+                        score_7,
+                        score_8,
+                        //Service Assessment Max Scores
+                        max_score_1,
+                        max_score_2,
+                        max_score_3,
+                        max_score_4,
+                        max_score_5,
+                        max_score_6,
+                        max_score_7,
+                        max_score_8,
+                        //Service Assessment Comments
+                        comments_1,
+                        comments_2,
+                        comments_3,
+                        comments_4,
+                        comments_5,
+                        comments_6,
+                        comments_7,
+                        comments_8,
+                        service_assessment_start,
+                        service_assessment_end));
+        $result = $query->execute();
+
+        //Cycle through the records and assign the data to variables
+        foreach ($result as $value)
+        {
+            $mill = $value-> mill;
+            $supplier_selected = $value-> supplier_number;
+            $display_name = $value-> supplier_name;
+            $supplier_year_selected = $value-> supplier_year;
+            $is_this_a_relationship = $value-> is_this_a_relationship;
+            $approved_status_answer = $value-> approved_status_answer;
+            $provisional_status_answer = $value-> provisional_status_answer;
+            $scorecard_start_date = $value-> scorecard_start_date;
+            $scorecard_end_date = $value-> scorecard_end_date;
+            //Quality GPA
+            $quality_gpa_score = $value-> quality_gpa_score;
+            $quality_gpa_color = $value-> quality_gpa_color;
+            $quality_total_number_pos = $value-> quality_total_number_pos;
+            $quality_total_approved_pos = $value-> quality_total_approved_pos;
+            $quality_sum_scars = $value-> quality_sum_scars;
+            $quality_sum_scars_closed = $value-> quality_sum_scars_closed;
+            //Delivery GPA
+            $delivery_gpa_score = $value-> delivery_gpa_score;
+            $delivery_gpa_color = $value-> delivery_gpa_color;
+            $delivery_total_number_pos = $value-> delivery_total_number_pos;
+            //Service GPA
+            $service_gpa_score = $value-> service_gpa_score;
+            $service_gpa_color = $value-> service_gpa_color;
+            $sac_recorder = $value-> sac_recorder;
+            $total_score = $value-> service_total_score;
+            $total_max_score = $value-> service_total_max_score;
+            $packing_slip_discrepancies_total = $value-> packing_slip_discrepancies_total;
+            //Performance Metrics
+            //Months
+            $previous_month_1_text = $value-> previous_month_1_text;
+            $previous_month_2_text = $value-> previous_month_2_text;
+            $previous_month_3_text = $value-> previous_month_3_text;
+            $previous_month_0_text = $value-> previous_month_0_text;
+            //Titles
+            $performance_metric_1 = $value-> performance_metric_1;
+            $performance_metric_2 = $value-> performance_metric_2;
+            $performance_metric_3 = $value-> performance_metric_3;
+            $performance_metric_4 = $value-> performance_metric_4;
+            $performance_metric_5 = $value-> performance_metric_5;
+            $performance_metric_6 = $value-> performance_metric_6;
+            $performance_metric_7 = $value-> performance_metric_7;
+            //Benchmarks
+            $benchmark_score_1 = $value-> benchmark_score_1;
+            $benchmark_score_2 = $value-> benchmark_score_2;
+            $benchmark_score_3 = $value-> benchmark_score_3;
+            $benchmark_score_4 = $value-> benchmark_score_4;
+            $benchmark_score_5 = $value-> benchmark_score_5;
+            $benchmark_score_6 = $value-> benchmark_score_6;
+            $benchmark_score_7 = $value-> benchmark_score_7;
+            //Goals
+            $goal_score_1 = $value-> goal_score_1;
+            $goal_score_2 = $value-> goal_score_2;
+            $goal_score_3 = $value-> goal_score_3;
+            $goal_score_4 = $value-> goal_score_4;
+            $goal_score_5 = $value-> goal_score_5;
+            $goal_score_6 = $value-> goal_score_6;
+            $goal_score_7 = $value-> goal_score_7;
+            //Status Metric 1
+            $status_metric_1_fy = $value-> status_metric_1_fy;
+            $status_metric_1_month_1 = $value-> status_metric_1_month_1;
+            $status_metric_1_month_2 = $value-> status_metric_1_month_2;
+            $status_metric_1_month_3 = $value-> status_metric_1_month_3;
+            //Status Metric 2
+            $status_metric_2_fy = $value-> status_metric_2_fy;
+            $status_metric_2_month_1 = $value-> status_metric_2_month_1;
+            $status_metric_2_month_2 = $value-> status_metric_2_month_2;
+            $status_metric_2_month_3 = $value-> status_metric_2_month_3;
+            //Status Metric 3
+            $status_metric_3_fy = $value-> status_metric_3_fy;
+            $status_metric_3_month_1 = $value-> status_metric_3_month_1;
+            $status_metric_3_month_2 = $value-> status_metric_3_month_2;
+            $status_metric_3_month_3 = $value-> status_metric_3_month_3;
+            //Status Metric 4
+            $status_metric_4_fy = $value-> status_metric_4_fy;
+            $status_metric_4_month_1 = $value-> status_metric_4_month_1;
+            $status_metric_4_month_2 = $value-> status_metric_4_month_2;
+            $status_metric_4_month_3 = $value-> status_metric_4_month_3;
+            //Status Metric 5
+            $status_metric_5_fy = $value-> status_metric_5_fy;
+            $status_metric_5_month_1 = $value-> status_metric_5_month_1;
+            $status_metric_5_month_2 = $value-> status_metric_5_month_2;
+            $status_metric_5_month_3 = $value-> status_metric_5_month_3;
+            //Status Metric 6
+            $status_metric_6_fy = $value-> status_metric_6_fy;
+            $status_metric_6_month_1 = $value-> status_metric_6_month_1;
+            $status_metric_6_month_2 = $value-> status_metric_6_month_2;
+            $status_metric_6_month_3 = $value-> status_metric_6_month_3;
+            //Status Metric 7
+            $status_metric_7_fy = $value-> status_metric_7_fy;
+            $status_metric_7_month_1 = $value-> status_metric_7_month_1;
+            $status_metric_7_month_2 = $value-> status_metric_7_month_2;
+            $status_metric_7_month_3 = $value-> status_metric_7_month_3;
+            //Trend Metric 1
+            $trend_metric_1_fy = $value-> trend_metric_1_fy;
+            $trend_metric_1_month_1 = $value-> trend_metric_1_month_1;
+            $trend_metric_1_month_2 = $value-> trend_metric_1_month_2;
+            $trend_metric_1_month_3 = $value-> trend_metric_1_month_3;
+            //Trend Metric 2
+            $trend_metric_2_fy = $value-> trend_metric_2_fy;
+            $trend_metric_2_month_1 = $value-> trend_metric_2_month_1;
+            $trend_metric_2_month_2 = $value-> trend_metric_2_month_2;
+            $trend_metric_2_month_3 = $value-> trend_metric_2_month_3;
+            //Trend Metric 3
+            $trend_metric_3_fy = $value-> trend_metric_3_fy;
+            $trend_metric_3_month_1 = $value-> trend_metric_3_month_1;
+            $trend_metric_3_month_2 = $value-> trend_metric_3_month_2;
+            $trend_metric_3_month_3 = $value-> trend_metric_3_month_3;
+            //Trend Metric 4
+            $trend_metric_4_fy = $value-> trend_metric_4_fy;
+            $trend_metric_4_month_1 = $value-> trend_metric_4_month_1;
+            $trend_metric_4_month_2 = $value-> trend_metric_4_month_2;
+            $trend_metric_4_month_3 = $value-> trend_metric_4_month_3;
+            //Trend Metric 5
+            $trend_metric_5_fy = $value-> trend_metric_5_fy;
+            $trend_metric_5_month_1 = $value-> trend_metric_5_month_1;
+            $trend_metric_5_month_2 = $value-> trend_metric_5_month_2;
+            $trend_metric_5_month_3 = $value-> trend_metric_5_month_3;
+            //Trend Metric 6
+            $trend_metric_6_fy = $value-> trend_metric_6_fy;
+            $trend_metric_6_month_1 = $value-> trend_metric_6_month_1;
+            $trend_metric_6_month_2 = $value-> trend_metric_6_month_2;
+            $trend_metric_6_month_3 = $value-> trend_metric_6_month_3;
+            //Trend Metric 7
+            $trend_metric_7_fy = $value-> trend_metric_7_fy;
+            $trend_metric_7_month_1 = $value-> trend_metric_7_month_1;
+            $trend_metric_7_month_2 = $value-> trend_metric_7_month_2;
+            $trend_metric_7_month_3 = $value-> trend_metric_7_month_3;
+            //Quality COA in specification scores
+            $quality_coa_in_specification = $value-> quality_coa_in_specification;
+            $quality_coa_in_specification_month_1 = $value-> quality_coa_in_specification_month_1;
+            $quality_coa_in_specification_month_2 = $value-> quality_coa_in_specification_month_2;
+            $quality_coa_in_specification_month_3 = $value-> quality_coa_in_specification_month_3;
+            //Scars scores
+            $quality_scars_issued_per_month = $value-> quality_scars_issued_per_month;
+            $quality_sum_scars_month_1 = $value-> quality_sum_scars_month_1;
+            $quality_sum_scars_month_2 = $value-> quality_sum_scars_month_2;
+            $quality_sum_scars_month_3 = $value-> quality_sum_scars_month_3;
+            //Delivery on time scores
+            $delivery_on_time = $value-> delivery_on_time;
+            $delivery_on_time_month_1 = $value-> delivery_on_time_month_1;
+            $delivery_on_time_month_2 = $value-> delivery_on_time_month_2;
+            $delivery_on_time_month_3 = $value-> delivery_on_time_month_3;
+            //Quality COA on time
+            $quality_coa_on_time = $value-> quality_coa_on_time;
+            $quality_coa_on_time_month_1 = $value-> quality_coa_on_time_month_1;
+            $quality_coa_on_time_month_2 = $value-> quality_coa_on_time_month_2;
+            $quality_coa_on_time_month_3 = $value-> quality_coa_on_time_month_3;
+            //Quality SCARS closure rate
+            $quality_scars_closure_rate = $value-> quality_scars_closure_rate;
+            $quality_scars_closure_rate_month_1 = $value-> quality_scars_closure_rate_month_1;
+            $quality_scars_closure_rate_month_2 = $value-> quality_scars_closure_rate_month_2;
+            $quality_scars_closure_rate_month_3 = $value-> quality_scars_closure_rate_month_3;
+            //Service rating scores
+            $service_rating = $value-> service_rating;
+            $service_rating_month_1 = $value-> service_rating_month_1;
+            $service_rating_month_2 = $value-> service_rating_month_2;
+            $service_rating_month_3 = $value-> service_rating_month_3;
+            //Packing slip accuracy scores
+            $packing_slip_accuracy = $value-> packing_slip_accuracy;
+            $packing_slip_accuracy_month_1 = $value-> packing_slip_accuracy_month_1;
+            $packing_slip_accuracy_month_2 = $value-> packing_slip_accuracy_month_2;
+            $packing_slip_accuracy_month_3 = $value-> packing_slip_accuracy_month_3;
+            //Service Assessment Questions
+            $question_1 = $value-> question_1;
+            $question_2 = $value-> question_2;
+            $question_3 = $value-> question_3;
+            $question_4 = $value-> question_4;
+            $question_5 = $value-> question_5;
+            $question_6 = $value-> question_6;
+            $question_7 = $value-> question_7;
+            $question_8 = $value-> question_8;
+            //Service Assessment Measures
+            $measure_1 = $value-> measure_1;
+            $measure_2 = $value-> measure_2;
+            $measure_3 = $value-> measure_3;
+            $measure_4 = $value-> measure_4;
+            $measure_5 = $value-> measure_5;
+            $measure_6 = $value-> measure_6;
+            $measure_7 = $value-> measure_7;
+            $measure_8 = $value-> measure_8;
+            //Service Assessment Scores
+            $score_1 = $value-> score_1;
+            $score_2 = $value-> score_2;
+            $score_3 = $value-> score_3;
+            $score_4 = $value-> score_4;
+            $score_5 = $value-> score_5;
+            $score_6 = $value-> score_6;
+            $score_7 = $value-> score_7;
+            $score_8 = $value-> score_8;
+            //Service Assessment Max Scores
+            $max_score_1 = $value-> max_score_1;
+            $max_score_2 = $value-> max_score_2;
+            $max_score_3 = $value-> max_score_3;
+            $max_score_4 = $value-> max_score_4;
+            $max_score_5 = $value-> max_score_5;
+            $max_score_6 = $value-> max_score_6;
+            $max_score_7 = $value-> max_score_7;
+            $max_score_8 = $value-> max_score_8;
+            //Service Assessment Comments
+            $comments_1 = $value-> comments_1;
+            $comments_2 = $value-> comments_2;
+            $comments_3 = $value-> comments_3;
+            $comments_4 = $value-> comments_4;
+            $comments_5 = $value-> comments_5;
+            $comments_6 = $value-> comments_6;
+            $comments_7 = $value-> comments_7;
+            $comments_8 = $value-> comments_8;
+
+            $service_assessment_start = $value-> service_assessment_start;
+            $service_assessment_end = $value-> service_assessment_end;
+
+        }//end of the foreach to cycle through rows
+
+
+    }//end of the existing record check to pull existing data
+
+    //Only if this is a new scorecard, do the filters and the calculations
+    if($existing_scorecard != "yes")
+    {
+        //set the title for new scorecards
+        drupal_set_title($title = "Generate Scorecard", $output = CHECK_PLAIN);
+
+    //******FILTERS SECTION******
+
+    //Harcoded mills..blaaaaaaaaaaaaaat
+    $mill_options = array('All'=>'All') + array('1001'=>'mill_x') + array('1550'=>'mill_y');
+
+    //If it is the first pass, then grab the user mill from their profile and use it as the default
+    if($form_state['run_once'] != "Yes")
+    {
+        $mill = get_user_mill();
+    }
+
+    $form['header_wrapper_open'] = array(
+        '#markup' => '<div id="header_wrapper" class="hide_when_printed">',
+    );
+
+    $form['mill'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $mill_options,
+     '#required' => FALSE,
+     '#prefix' => '<table id="scorecard_header"><tr><td width="10"><span class="beautytips" title="Select a mill to view only the suppliers associated with that Mill.">Mill: </span></td><td width="10">',
+     '#suffix' => '</td><td width="10"><span class="beautytips" title="Suppliers preceded with an Asterisk denote a relationship. Only relationships with at least one supplier in it from the selected mill will be shown in the drop down list.">Supplier: </span></td><td width="10">',
+     '#default_value' => $mill,
+     '#ajax' => array(
+        'callback' =>'ajax_scorecard_callback',
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL,
+        ),
+     ),
+    );
+
+    //If it is the first pass, then grab the user mill from their profile and use it to populate the supplier list
+    if($form_state['run_once'] != "Yes")
+    {
+        $mill = get_user_mill();
+    }
+    else
+    {
+        $mill = $form_state['values']['mill'];
+    }
+
+    $supplier_options = array('-Select-'=>'-Select-') + combined_supplier_and_relationship_list($mill);
+
+    $form['supplier'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $supplier_options,
+     '#required' => FALSE,
+     '#prefix' => '<div id="supplier">',
+     '#suffix' => '</div>',
+     '#default_value' => $supplier_selected,
+     '#ajax' => array(
+        'callback' =>'ajax_scorecard_callback',
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+    //If it is the first pass, then do not use the value from the field, just stick with the one defined at the top
+    if($form_state['run_once'] == "Yes")
+    {
+        $supplier_selected = $form_state['values']['supplier'];
+    }
+
+    //Determine if the "supplier" (number) chosen is a relationship and if it is get all of the
+    //related vendors and throw them in an array. Also, set the display name
+    $is_this_a_relationship = is_this_a_relationship($supplier_selected);
+    $suppliers = array();
+
+    if ($is_this_a_relationship == "Yes")
+    {
+        $suppliers = get_list_of_suppliers_in_relationship($supplier_selected);
+        $display_name = get_alias_name_from_relationship_table($supplier_selected);
+        //Get the mill(s) associated with this relationship to record when saved
+        $related_mill = what_mill_is_relationship_associated_with($supplier_selected);
+    }
+    else
+    {
+        $suppliers = array($supplier_selected=>$supplier_selected);
+        $display_name = get_supplier_name_from_maintenance_table($supplier_selected);
+        //Get the mill associated with this supplier to record when saved
+        $related_mill = get_mill_from_maintenance_table($supplier_selected);
+    }
+
+    $form['year_start'] = array(
+        '#markup' => '</td><td width="10"><span class="beautytips" title="The data for the scorecard will be pulled based off of the year selected.">Year: </td><td width="10">'
+    );
+
+    $supplier_year_options = array('-Select-'=>'-Select-') + return_delivery_year($suppliers,$mill);
+
+    $form['supplier_year'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $supplier_year_options,
+     '#required' => FALSE,
+     '#prefix' => '<div id="supplier_year">',
+     '#suffix' => '</div>',
+     '#default_value' => $supplier_year_selected,
+     '#ajax' => array(
+        'callback' =>'ajax_scorecard_callback',
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+    //If it is the first pass, then do not use the value from the field, just stick with the one defined at the top
+    if($form_state['run_once'] == "Yes")
+    {
+        $supplier_year_selected = $form_state['values']['supplier_year'];
+    }
+
+    $form['printer_friendly_links'] = array(
+    '#markup' => '</td><td class="scorecard_print_button"><a href="/sites/all/modules/form_scorecard/print_help.html" target="_blank"><span class="beautytips grow" title="Click to view the recommended print settings."><img src="/images/icon_questionmark.png" class="print_help_image"></span></a></td></tr></table>',
+    );
+
+    $form['header_wrapper_close'] = array(
+        '#markup' => '</div>',
+    );
+
+    //*********BUILD THE GIANT SCORECARD********
+
+        //Give default value to variables so they dont show up as blank
+	$quality_sum_scars = "0";
+	$quality_sum_scars_month_0 = "0";
+	$quality_sum_scars_month_1 = "0";
+	$quality_sum_scars_month_2 = "0";
+	$quality_sum_scars_month_3 = "0";
+
+	$quality_sum_scars_closed = "0";
+	$quality_sum_scars_closed_month_0 = "0";
+	$quality_sum_scars_closed_month_1 = "0";
+	$quality_sum_scars_closed_month_2 = "0";
+	$quality_sum_scars_closed_month_3 = "0";
+
+	$go_time = "yes";
+
+	//Set the variables used in the queries
+	$search_year = $supplier_year_selected;
+
+	//Breakdown date elements to use throughout the scorecard
+	$current_year = date("Y");
+	$current_month = date("m");
+	$previous_year = date("Y", strtotime("-1 Year"));
+
+	//Assign values for last three months if it is for the current year.  Otherwise, grab the final 3 months of the year
+	if($search_year == $current_year) {
+	  $previous_month_0 = date('m',(strtotime('-3 months',strtotime(date('m/15/y')))));
+          $previous_month_1 = date('m',(strtotime('-2 months',strtotime(date('m/15/y')))));
+          $previous_month_2 = date('m',(strtotime('-1 months',strtotime(date('m/15/y')))));
+	  $previous_month_3 = date("m");
+
+	  $previous_month_0_text = date('F',(strtotime('-3 months',strtotime(date('m/15/y')))));
+	  $previous_month_1_text = date('F',(strtotime('-2 months',strtotime(date('m/15/y')))));
+          $previous_month_2_text = date('F',(strtotime('-1 months',strtotime(date('m/15/y')))));
+	  $previous_month_3_text = date("F");
+	}
+	else{
+	  $previous_month_0 = 9;
+	  $previous_month_1 = 10;
+	  $previous_month_2 = 11;
+	  $previous_month_3 = 12;
+
+	  $previous_month_0_text = "September";
+	  $previous_month_1_text = "October";
+	  $previous_month_2_text = "November";
+	  $previous_month_3_text = "December";
+	}
+	//These dates are used for the display
+	$scorecard_start_date = 'January '.$search_year;
+	$scorecard_end_date = $previous_month_3_text ." ".$search_year;
+
+        //Get the provisional and approval status
+        //Get the status for each supplier. We aren't showing this for relationships
+        //now but just in case we decide to in the future, its already here.
+        foreach ($suppliers as $value)
+        {
+            $search_supplier = $value;
+
+            $query_pa_status = db_select('company_x_supplier_maintenance', 'g') //db table name and alias
+                ->condition('vendor', $search_supplier)
+                ->fields('g', array('id','approved_status','provisional_status'));  //table name, then field(s)
+            $results_pa_status = $query_pa_status->execute();
+
+            //Cycle through the records and assign the data to variables
+            $approved_status = array();
+            $provisional_status = array();
+            foreach ($results_pa_status as $row)
+            {
+                $approved_status[] = $row->approved_status;
+                $provisional_status[] = $row->provisional_status;
+            }
+        }
+
+	$approved_status_answer = $approved_status[0];
+        $provisional_status_answer = $provisional_status[0];
+
+	//***************QUALITY GPA***************
+
+        $quality_result_temp = array();
+        $quality_result = array();
+
+        //Get the data for each supplier and combine the rows
+        foreach ($suppliers as $value)
+        {
+            $search_supplier = $value;
+
+            //extract the records from the company_x_quality table based on vendor and year.
+            $quality_query = "SELECT * FROM {company_x_quality} WHERE vendor = :vendor AND EXTRACT(YEAR FROM del_date) = :date";
+            $quality_result_query = db_query($quality_query, array(':vendor' => $search_supplier,':date' => $search_year));
+            $quality_result_temp = $quality_result_query->fetchAll();
+            $quality_result = array_merge($quality_result,$quality_result_temp);
+
+        }//end loop to account for individual suppliers
+
+        //get total number of records for year
+        $quality_total_number_pos = count($quality_result);
+
+	//check to see if data was found. If not, skip the rest and assign N/D to GPA and other calcs for display.
+	if (empty($quality_total_number_pos)){
+	  $quality_no_data_message = "No data found for " .$display_name. " in " .$search_year;
+	  $quality_gpa_score = "N/D";
+
+	  $quality_coa_in_specification = "N/D";
+	  $quality_coa_in_specification_month_0 = "N/D";
+	  $quality_coa_in_specification_month_1 = "N/D";
+	  $quality_coa_in_specification_month_2 = "N/D";
+	  $quality_coa_in_specification_month_3 = "N/D";
+
+	  $quality_scars_issued_per_month = "N/D";
+          $quality_sum_scars_month_0 = "N/D";
+	  $quality_sum_scars_month_1 = "N/D";
+	  $quality_sum_scars_month_2 = "N/D";
+	  $quality_sum_scars_month_3 = "N/D";
+
+	  $quality_scars_closure_rate = "N/D";
+          $quality_scars_closure_rate_month_0 = "N/D";
+	  $quality_scars_closure_rate_month_1 = "N/D";
+	  $quality_scars_closure_rate_month_2 = "N/D";
+	  $quality_scars_closure_rate_month_3 = "N/D";
+
+	  $quality_coa_on_time = "N/D";
+          $quality_coa_on_time_month_0 = "N/D";
+	  $quality_coa_on_time_month_1 = "N/D";
+	  $quality_coa_on_time_month_2 = "N/D";
+	  $quality_coa_on_time_month_3 = "N/D";
+	}
+
+	//if data is found, do the calculations
+	else
+	{
+	  $quality_coa_on_time_records = array();
+	  $quality_coa_on_time_records_month_1 = array();
+	  $quality_coa_on_time_records_month_2 = array();
+	  $quality_coa_on_time_records_month_3 = array();
+	  $quality_scars_closed_records = array();
+	  $quality_scars_closed_records_month_1 = array();
+	  $quality_scars_closed_records_month_2 = array();
+	  $quality_scars_closed_records_month_3 = array();
+
+	  foreach ($quality_result as $row) {
+
+	    //get fields for calculations
+		$quality_days_late = $row->days_late;
+	        $quality_coa_status = $row->coa_status;
+		$quality_issue_date = $row->issue_date;
+		$quality_delivery_date = $row->del_date;
+		$quality_scars_issue_date = $row->issue_date;
+		$quality_scars_closure_date = $row->closure_date;
+		$quality_delivery_month = date("m", strtotime($quality_delivery_date));
+		//drupal_set_message($quality_delivery_month, $type = 'status', $repeat = TRUE);
+
+		//YTD
+		//These two variables are only used on page two of the scorecard
+		if($quality_days_late <= 0 )
+		{
+                    $quality_sum_coa_on_time = $quality_sum_coa_on_time + 1;
+		}
+
+		//count total number of approved records
+	    if($quality_coa_status &&($quality_coa_status == "Approved" || $quality_coa_status == "APPROVED")) {
+        	$quality_total_approved_pos = $quality_total_approved_pos + 1;
+		}
+
+		//Count total number of records with a scars issue date. This is used only on page two of the scorecard
+		if (empty($quality_issue_date) || $quality_issue_date == "0000-00-00")
+                {
+        	//do nothing
+		}
+		else
+                {
+                    $quality_sum_scars = $quality_sum_scars + 1;
+		}
+
+		//Count the closed scars
+		if($quality_scars_issue_date != '0000-00-00' && $quality_scars_closure_date != '0000-00-00')
+		{
+			$quality_sum_scars_closed = $quality_sum_scars_closed + 1;
+		}
+
+		//Month 0
+		if ($quality_delivery_month == $previous_month_0){
+		   if($quality_days_late <= 0 )
+		   {
+		    	$quality_sum_coa_on_time_month_0 = $quality_sum_coa_on_time_month_0 + 1;
+		   }
+
+	       //count total number of approved records
+	       if($quality_coa_status &&($quality_coa_status == "Approved" || $quality_coa_status == "APPROVED")) {
+             	$quality_total_approved_pos_month_0 = $quality_total_approved_pos_month_0 + 1;
+		   }
+
+		   //Count total number of records with a scars issue date. This is used only on page two of the scorecard
+		   if (empty($quality_issue_date) || $quality_issue_date == "0000-00-00"){
+        	//do nothing
+		   }
+		   else {
+			   $quality_sum_scars_month_0 = $quality_sum_scars_month_0 + 1;
+		   }
+
+		   //Count the closed scars
+		   if($quality_scars_issue_date != '0000-00-00' && $quality_scars_closure_date != '0000-00-00')
+		   {
+		 	  $quality_sum_scars_closed_month_0 = $quality_sum_scars_closed_month_0 + 1;
+		   }
+
+		   $quality_total_number_pos_month_0 = $quality_total_number_pos_month_0 + 1;
+
+		}
+
+		//Month 1
+		if ($quality_delivery_month == $previous_month_1){
+		   if($quality_days_late <= 0 )
+		   {
+		    	$quality_sum_coa_on_time_month_1 = $quality_sum_coa_on_time_month_1 + 1;
+		   }
+
+		   $quality_total_number_pos_month_1 = $quality_total_number_pos_month_1 + 1;
+
+               //count total number of approved records
+	       if($quality_coa_status &&($quality_coa_status == "Approved" || $quality_coa_status == "APPROVED")) {
+             	$quality_total_approved_pos_month_1 = $quality_total_approved_pos_month_1 + 1;
+		   }
+
+		   //Count total number of records with a scars issue date. This is used only on page two of the scorecard
+		   if (empty($quality_issue_date) || $quality_issue_date == "0000-00-00"){
+        	//do nothing
+		   }
+		   else {
+			   $quality_sum_scars_month_1 = $quality_sum_scars_month_1 + 1;
+		   }
+
+		   //Count the closed scars
+		   if($quality_scars_issue_date != '0000-00-00' && $quality_scars_closure_date != '0000-00-00')
+		   {
+		 	  $quality_sum_scars_closed_month_1 = $quality_sum_scars_closed_month_1 + 1;
+		   }
+
+		}
+
+		//Month 2
+		if ($quality_delivery_month == $previous_month_2){
+		   if($quality_days_late <= 0 )
+		   {
+		    	$quality_sum_coa_on_time_month_2 = $quality_sum_coa_on_time_month_2 + 1;
+		   }
+
+		   $quality_total_number_pos_month_2 = $quality_total_number_pos_month_2 + 1;
+
+		   //count total number of approved records
+	       if($quality_coa_status &&($quality_coa_status == "Approved" || $quality_coa_status == "APPROVED")) {
+             	$quality_total_approved_pos_month_2 = $quality_total_approved_pos_month_2 + 1;
+		   }
+
+		   //Count total number of records with a scars issue date. This is used only on page two of the scorecard
+		   if (empty($quality_issue_date) || $quality_issue_date == "0000-00-00"){
+        	//do nothing
+		   }
+		   else {
+			   $quality_sum_scars_month_2 = $quality_sum_scars_month_2 + 1;
+		   }
+
+		   //Count the closed scars
+		   if($quality_scars_issue_date != '0000-00-00' && $quality_scars_closure_date != '0000-00-00')
+		   {
+		 	  $quality_sum_scars_closed_month_2 = $quality_sum_scars_closed_month_2 + 1;
+		   }
+
+		}
+		//Month 3
+		if ($quality_delivery_month == $previous_month_3){
+		   if($quality_days_late <= 0 )
+		   {
+		    	$quality_sum_coa_on_time_month_3 = $quality_sum_coa_on_time_month_3 + 1;
+		   }
+
+     	   //count total number of approved records
+	       if($quality_coa_status &&($quality_coa_status == "Approved" || $quality_coa_status == "APPROVED")) {
+             	$quality_total_approved_pos_month_3 = $quality_total_approved_pos_month_3 + 1;
+		   }
+
+		   //Count total number of records with a scars issue date. This is used only on page two of the scorecard
+		   if (empty($quality_issue_date) || $quality_issue_date == "0000-00-00"){
+        	//do nothing
+		   }
+		   else {
+			   $quality_sum_scars_month_3 = $quality_sum_scars_month_3 + 1;
+		   }
+
+		   //Count the closed scars
+		   if($quality_scars_issue_date != '0000-00-00' && $quality_scars_closure_date != '0000-00-00')
+		   {
+		 	  $quality_sum_scars_closed_month_3 = $quality_sum_scars_closed_month_3 + 1;
+		   }
+
+		   $quality_total_number_pos_month_3 = $quality_total_number_pos_month_3 + 1;
+
+		}
+
+	  }//end foreach loop
+
+	  //Calculate COA In Specification percentage
+	  //YTD
+	  $quality_coa_in_specification = intval($quality_total_approved_pos/$quality_total_number_pos * 100);
+
+	  //Month 0
+	  //If there are no records for month assign N/A
+	  if (empty($quality_total_approved_pos_month_0)){
+		  $quality_coa_in_specification_month_0 = "N/A";
+	  }
+	  else{
+	  $quality_coa_in_specification_month_0 = intval($quality_total_approved_pos_month_0/$quality_total_number_pos_month_0 * 100);
+	  }
+
+	  //Month 1
+	  //If there are no records for month assign N/A
+	  if (empty($quality_total_approved_pos_month_1)){
+		  $quality_coa_in_specification_month_1 = "N/A";
+	  }
+	  else{
+	  $quality_coa_in_specification_month_1 = intval($quality_total_approved_pos_month_1/$quality_total_number_pos_month_1 * 100);
+	  }
+
+	  //Month 2
+	  //If there are no records for month assign N/A
+	  if (empty($quality_total_approved_pos_month_2)){
+		  $quality_coa_in_specification_month_2 = "N/A";
+	  }
+	  else{
+	  $quality_coa_in_specification_month_2 = intval($quality_total_approved_pos_month_2/$quality_total_number_pos_month_2 * 100);
+	  }
+
+	  //Month 3
+	  //If there are no records for month assign N/A
+	  if (empty($quality_total_approved_pos_month_3)){
+		  $quality_coa_in_specification_month_3 = "N/A";
+	  }
+	  else{
+	  $quality_coa_in_specification_month_3 = intval($quality_total_approved_pos_month_3/$quality_total_number_pos_month_3 * 100);
+	  }
+
+	  //Get the GPA from the company_x_gpa_metrics table
+	  $quality_gpa_query = "SELECT * FROM {company_x_gpa_metrics} WHERE :coa BETWEEN min_range_value AND max_range_value AND supplier_activity = :supplier_activity";
+          $quality_gpa_result = db_query($quality_gpa_query, array(':coa' => $quality_coa_in_specification,':supplier_activity' => "Quality"));
+
+	   foreach ($quality_gpa_result as $row) {
+            //get gpa score
+	    $quality_gpa_score = $row->gpa_score;
+	   }
+
+	}//end if for data check
+
+	//***************DELIVERY GPA***************
+
+        $delivery_result_temp = array();
+        $delivery_result = array();
+        $packing_slip_result_temp = array();
+        $packing_slip_result = array();
+
+        //Get the data for each supplier and combine the rows
+        foreach ($suppliers as $value)
+        {
+            $search_supplier = $value;
+
+            //extract the records from the company_x_delivery table based on vendor and year.
+            //choose the table to get the data from based on the vendor's mill
+            $vendor_mill = get_mill_from_maintenance_table($search_supplier);
+
+            if ($vendor_mill == "1001")
+            {
+                $delivery_query = "SELECT * FROM {company_x_delivery} WHERE vendor = :vendor AND EXTRACT(YEAR FROM expected_del_date) = :date";
+            }
+            else if ($vendor_mill == "1550")
+            {
+                $delivery_query = "SELECT * FROM {company_x_delivery_ch} WHERE vendor = :vendor AND EXTRACT(YEAR FROM expected_del_date) = :date";
+            }
+            else //should never happen, can use for later
+            {
+                $delivery_query = "SELECT * FROM {company_x_delivery} WHERE vendor = :vendor AND EXTRACT(YEAR FROM expected_del_date) = :date";
+            }
+
+            $delivery_result_query = db_query($delivery_query, array(':vendor' => $search_supplier,':date' => $search_year));
+            $delivery_result_temp = $delivery_result_query->fetchAll();
+            $delivery_result = array_merge($delivery_result,$delivery_result_temp);
+
+            //Get all of the packing slip records associated with the supplier
+            $packing_slip_query = "SELECT * FROM {company_x_packing_slip_accuracy} WHERE vendor = :vendor AND import_year = :date";
+            $packing_slip_query_result = db_query($packing_slip_query, array(':vendor' => $search_supplier,':date' => $search_year));
+            $packing_slip_result_temp = $packing_slip_query_result->fetchAll();
+            $packing_slip_result = array_merge($packing_slip_result,$packing_slip_result_temp);
+
+        }//end cycling through individual suppliers
+
+        $delivery_total_number_pos_check = count($delivery_result);
+
+	//check to see if data was found. If not, skip the rest and assign N/D to GPA and other calcs for display.
+	if (empty($delivery_total_number_pos_check)){
+	  $delivery_no_data_message = "No data found for " .$display_name. " in " .$search_year;
+	  $delivery_gpa_score = "N/D";
+
+          //Metric 3 displayed on page two with goals and benchmarks etc
+          $delivery_on_time = "N/D";
+          $delivery_on_time_month_0 = "N/D";
+	  $delivery_on_time_month_1 = "N/D";
+	  $delivery_on_time_month_2 = "N/D";
+	  $delivery_on_time_month_3 = "N/D";
+
+          //Metric 7 displayed on page two with goals and benchmarks etc
+          $packing_slip_accuracy = "N/D";
+          $packing_slip_accuracy_month_0 = "N/D";
+	  $packing_slip_accuracy_month_1 = "N/D";
+	  $packing_slip_accuracy_month_2 = "N/D";
+	  $packing_slip_accuracy_month_3 = "N/D";
+	}
+	//if data is found, do the calculations
+	else
+	{
+
+	  $delivery_weight_of_po2 = array();//used for testing against imported calcs
+	  foreach ($delivery_result as $row) {
+
+		//Get variables for calculations
+		$delivery_expected_date = $row->expected_del_date;
+		$delivery_actual_date = $row->actual_del_date;
+                $delivery_item_category = $row->item_cat;
+                $delivery_cc_key = $row->cc_key;
+		$delivery_expected_month = date("m", strtotime($delivery_expected_date));
+		$delivery_weight_of_po2[$row->id] = $row->weight_of_po;//used for testing against imported calcs
+
+                //Only do this for records that have actual delivery dates
+		if (!empty($delivery_actual_date)){
+
+		//YTD
+		$delivery_total_number_pos = $delivery_total_number_pos + 1;
+
+		//Calculate the number of days early/late
+		$delivery_days_late_ytd = round((strtotime($delivery_actual_date) - strtotime($delivery_expected_date))/86400);
+		$total_number_days_late = $total_number_days_late + $delivery_days_late_ytd; //used for debugging only
+
+                //Lookup weight of PO based on days early/late and item category status
+                $delivery_weight_of_po = weighted_po_value($delivery_days_late_ytd, $delivery_item_category, $delivery_cc_key);
+
+		//sum po weight
+		$delivery_sum_weight_of_po = $delivery_sum_weight_of_po + $delivery_weight_of_po;
+		//reset the variable in case it doesnt find a value to replace it on the next record
+		$delivery_weight_of_po = 0;
+
+		//Month 0
+		if ($delivery_expected_month == $previous_month_0){
+
+		  //Calculate the number of days early/late
+		  $delivery_days_late_month_0 = round((strtotime($delivery_actual_date) - strtotime($delivery_expected_date))/86400);
+
+                  //Lookup weight of PO based on days early/late and item category status
+                  $delivery_weight_of_po_month_0 = weighted_po_value($delivery_days_late_month_0, $delivery_item_category, $delivery_cc_key);
+
+		  //sum po weight
+		  $delivery_sum_weight_of_po_month_0 = $delivery_sum_weight_of_po_month_0 + $delivery_weight_of_po_month_0;
+		  //reset the variable in case it doesnt find a value to replace it on the next record
+		  $delivery_weight_of_po_month_0 = 0;
+
+		  //Get total number of pos
+		  $delivery_total_number_pos_month_0 = $delivery_total_number_pos_month_0 + 1;
+		}//end month 0
+
+		//Month 1
+		if ($delivery_expected_month == $previous_month_1){
+		  //Calculate the number of days early/late
+		  $delivery_days_late_month_1 = round((strtotime($delivery_actual_date) - strtotime($delivery_expected_date))/86400);
+
+                  //Lookup weight of PO based on days early/late and item category status
+                  $delivery_weight_of_po_month_1 = weighted_po_value($delivery_days_late_month_1, $delivery_item_category, $delivery_cc_key);
+
+		  //sum po weight
+		  $delivery_sum_weight_of_po_month_1 = $delivery_sum_weight_of_po_month_1 + $delivery_weight_of_po_month_1;
+		  //reset the variable in case it doesnt find a value to replace it on the next record
+		  $delivery_weight_of_po_month_1 = 0;
+
+		  //Get total number of pos
+		  $delivery_total_number_pos_month_1 = $delivery_total_number_pos_month_1 + 1;
+		}//end month 1
+
+		//Month 2
+		if ($delivery_expected_month == $previous_month_2){
+		  //Calculate the number of days early/late
+		  $delivery_days_late_month_2 = round((strtotime($delivery_actual_date) - strtotime($delivery_expected_date))/86400);
+
+                  //Lookup weight of PO based on days early/late and item category status
+                  $delivery_weight_of_po_month_2 = weighted_po_value($delivery_days_late_month_2, $delivery_item_category, $delivery_cc_key);
+
+		  //sum po weight
+		  $delivery_sum_weight_of_po_month_2 = $delivery_sum_weight_of_po_month_2 + $delivery_weight_of_po_month_2;
+		  //reset the variable in case it doesnt find a value to replace it on the next record
+		  $delivery_weight_of_po_month_2 = 0;
+
+		  //Get total number of pos
+		  $delivery_total_number_pos_month_2 = $delivery_total_number_pos_month_2 + 1;
+		}//end month 2
+
+		//Month 3
+		if ($delivery_expected_month == $previous_month_3){
+		  //Calculate the number of days early/late
+		  $delivery_days_late_month_3 = round((strtotime($delivery_actual_date) - strtotime($delivery_expected_date))/86400);
+
+		  //Lookup weight of PO based on days early/late and item category status
+                  $delivery_weight_of_po_month_3 = weighted_po_value($delivery_days_late_month_3, $delivery_item_category, $delivery_cc_key);
+
+		  //sum po weight
+		  $delivery_sum_weight_of_po_month_3 = $delivery_sum_weight_of_po_month_3 + $delivery_weight_of_po_month_3;
+		  //reset the variable in case it doesnt find a value to replace it on the next record
+		  $delivery_weight_of_po_month_3 = 0;
+
+		  //Get total number of pos
+		  $delivery_total_number_pos_month_3 = $delivery_total_number_pos_month_3 + 1;
+		}//end month 3
+
+	  } //end foreach loop
+	  } //end check for actual delivery date
+
+	  //sum weight of po
+	  $delivery_sum_weight_of_po2 = array_sum($delivery_weight_of_po2);//used for testing against imported calcs
+
+	  //Calculate on time delivery
+	  //FY
+	  $delivery_on_time =  round($delivery_sum_weight_of_po/$delivery_total_number_pos * 100);
+
+	  //Month 0
+	  //If there are no records for month assign N/A
+	  if (empty($delivery_total_number_pos_month_0)){
+		$delivery_on_time_month_0 = "N/A";
+	  }
+	  else{
+	  $delivery_on_time_month_0 =  round($delivery_sum_weight_of_po_month_0/$delivery_total_number_pos_month_0 * 100);
+	  }
+
+	  //Month 1
+	  //If there are no records for month assign N/A
+	  if (empty($delivery_total_number_pos_month_1)){
+		$delivery_on_time_month_1 = "N/A";
+	  }
+	  else{
+	  $delivery_on_time_month_1 =  round($delivery_sum_weight_of_po_month_1/$delivery_total_number_pos_month_1 * 100);
+	  }
+
+	  //Month 2
+	  //If there are no records for month assign N/A
+	  if (empty($delivery_total_number_pos_month_2)){
+		$delivery_on_time_month_2 = "N/A";
+	  }
+	  else{
+	  $delivery_on_time_month_2 =  round($delivery_sum_weight_of_po_month_2/$delivery_total_number_pos_month_2 * 100);
+	  }
+
+	  //Month 3
+	  //If there are no records for month assign N/A
+	  if (empty($delivery_total_number_pos_month_3)){
+		$delivery_on_time_month_3 = "N/A";
+	  }
+	  else{
+	  $delivery_on_time_month_3 =  round($delivery_sum_weight_of_po_month_3/$delivery_total_number_pos_month_3 * 100);
+	  }
+
+	  //Get the GPA from the company_x_gpa_metrics table
+	  $delivery_gpa_query = "SELECT * FROM {company_x_gpa_metrics} WHERE :dot BETWEEN min_range_value AND max_range_value AND supplier_activity = :supplier_activity";
+      $delivery_gpa_result = db_query($delivery_gpa_query, array(':dot' => $delivery_on_time,':supplier_activity' => "Delivery"));
+
+	   foreach ($delivery_gpa_result as $row) {
+         //get gpa score
+	    $delivery_gpa_score = $row->gpa_score;
+	   }
+
+            //Calculate the packing slip accuracy for the year and for the last 4 months
+            //Cycle through the records and get the data for calculations
+            foreach ($packing_slip_result as $row)
+            {
+                $discrepancy_date = $row->import_date;
+                $discrepancy_month = date("m", strtotime($discrepancy_date));
+
+                //Month 0
+		if ($discrepancy_month == $previous_month_0)
+                {
+                    $packing_slip_discrepancies_month_0 = $packing_slip_discrepancies_month_0 + 1;
+                }
+
+                //Month 1
+		if ($discrepancy_month == $previous_month_1)
+                {
+                    $packing_slip_discrepancies_month_1 = $packing_slip_discrepancies_month_1 + 1;
+                }
+
+                //Month 2
+		if ($discrepancy_month == $previous_month_2)
+                {
+                    $packing_slip_discrepancies_month_2 = $packing_slip_discrepancies_month_2 + 1;
+                }
+
+                //Month 3
+		if ($discrepancy_month == $previous_month_3)
+                {
+                    $packing_slip_discrepancies_month_3 = $packing_slip_discrepancies_month_3 + 1;
+                }
+
+            }//end looping through packing slip query results
+
+            //Calculate the packing slip accuracy percentages
+            $packing_slip_discrepancies_total = count($packing_slip_result);
+
+            //FY
+            $packing_slip_accuracy = intval((($delivery_total_number_pos - $packing_slip_discrepancies_total) / $delivery_total_number_pos) * 100);
+
+            //Month 0
+            //If there are no records for month assign N/A
+            if (empty($delivery_total_number_pos_month_0)){
+            $packing_slip_accuracy_month_0 = "N/A";
+            }
+            else
+            {
+            $packing_slip_accuracy_month_0 =  intval((($delivery_total_number_pos_month_0 - $packing_slip_discrepancies_month_0) / $delivery_total_number_pos_month_0) * 100);
+            }
+
+            //Month 1
+            //If there are no records for month assign N/A
+            if (empty($delivery_total_number_pos_month_1)){
+            $packing_slip_accuracy_month_1 = "N/A";
+            }
+            else
+            {
+            $packing_slip_accuracy_month_1 =  intval((($delivery_total_number_pos_month_1 - $packing_slip_discrepancies_month_1) / $delivery_total_number_pos_month_1) * 100);
+            }
+
+            //Month 2
+            //If there are no records for month assign N/A
+            if (empty($delivery_total_number_pos_month_2)){
+            $packing_slip_accuracy_month_2 = "N/A";
+            }
+            else
+            {
+            $packing_slip_accuracy_month_2 =  intval((($delivery_total_number_pos_month_2 - $packing_slip_discrepancies_month_2) / $delivery_total_number_pos_month_2) * 100);
+            }
+
+            //Month 3
+            //If there are no records for month assign N/A
+            if (empty($delivery_total_number_pos_month_3)){
+            $packing_slip_accuracy_month_3 = "N/A";
+            }
+            else
+            {
+            $packing_slip_accuracy_month_3 =  intval((($delivery_total_number_pos_month_3 - $packing_slip_discrepancies_month_3) / $delivery_total_number_pos_month_3) * 100);
+            }
+
+	}//end if for data check
+
+	//***************SERVICE GPA***************
+
+	//extract the records from the company_x_supplier_service table based on vendor and year.
+	$service_query = "SELECT * FROM {company_x_supplier_service} WHERE supplier_number = :vendor AND EXTRACT(YEAR FROM end_date) = :date ORDER BY end_date DESC LIMIT 0,1";
+        $service_result = db_query($service_query, array(':vendor' => $supplier_selected,':date' => $search_year));
+   	//get total number of records
+	$service_total_number_records = $service_result->rowCount();
+
+	//check to see if data was found. If not, skip the rest and assign NA to the GPA score and other variables.
+	if (empty($service_total_number_records)){
+	  $service_no_data_message = "No data found for " .$display_name. " in " .$search_year;
+	  $service_gpa_score = "N/D";
+	  $service_rating = "N/D";
+	  $service_rating_month_0 = "N/D";
+	  $service_rating_month_1 = "N/D";
+	  $service_rating_month_2 = "N/D";
+	  $service_rating_month_3 = "N/D";
+	}
+	//if data is found, do the calculations
+	else {
+	foreach ($service_result as $row) {
+        //get total_points, total_max_points, and dates
+	$total_score = $row->total_points;
+	$total_max_score = $row->total_max_points;
+        $service_assessment_start = $row->start_date;
+        $service_assessment_end = $row->end_date;
+
+	//Get data to display on PAGE 3 of scorecard
+	$question_1 = $row->measure_1_question;
+        $measure_1 = $row->measure_1_title;
+        $score_1 = $row->measure_1_points;
+        $max_score_1 = $row->measure_1_max;
+        $comments_1 = $row->measure_1_comments;
+
+	$question_2 = $row->measure_2_question;
+        $measure_2 = $row->measure_2_title;
+        $score_2 = $row->measure_2_points;
+        $max_score_2 = $row->measure_2_max;
+        $comments_2 = $row->measure_2_comments;
+
+        $question_3 = $row->measure_3_question;
+        $measure_3 = $row->measure_3_title;
+        $score_3 = $row->measure_3_points;
+        $max_score_3 = $row->measure_3_max;
+        $comments_3 = $row->measure_3_comments;
+
+	$question_4 = $row->measure_4_question;
+        $measure_4 = $row->measure_4_title;
+        $score_4 = $row->measure_4_points;
+        $max_score_4 = $row->measure_4_max;
+        $comments_4 = $row->measure_4_comments;
+
+	$question_5 = $row->measure_5_question;
+        $measure_5 = $row->measure_5_title;
+        $score_5 = $row->measure_5_points;
+        $max_score_5 = $row->measure_5_max;
+        $comments_5 = $row->measure_5_comments;
+
+	$question_6 = $row->measure_6_question;
+        $measure_6 = $row->measure_6_title;
+        $score_6 = $row->measure_6_points;
+        $max_score_6 = $row->measure_6_max;
+        $comments_6 = $row->measure_6_comments;
+
+	$question_7 = $row->measure_7_question;
+        $measure_7 = $row->measure_7_title;
+        $score_7 = $row->measure_7_points;
+        $max_score_7 = $row->measure_7_max;
+        $comments_7 = $row->measure_7_comments;
+
+	$question_8 = $row->measure_8_question;
+        $measure_8 = $row->measure_8_title;
+        $score_8 = $row->measure_8_points;
+        $max_score_8 = $row->measure_8_max;
+        $comments_8 = $row->measure_8_comments;
+	}
+
+	  //calculate service rating
+	  $service_rating = intval($total_score/$total_max_score*100);
+
+	  //Months Service Rating is the same for all months since they only do the worksheet annually
+	  $service_rating_month_0 = $service_rating;
+	  $service_rating_month_1 = $service_rating;
+	  $service_rating_month_2 = $service_rating;
+	  $service_rating_month_3 = $service_rating;
+
+	  //Get the GPA from the company_x_gpa_metrics table
+	  $service_gpa_query = "SELECT * FROM {company_x_gpa_metrics} WHERE :sr BETWEEN min_range_value AND max_range_value AND supplier_activity = :supplier_activity";
+          $service_gpa_result = db_query($service_gpa_query, array(':sr' => $service_rating,':supplier_activity' => "Service"));
+
+	   foreach ($service_gpa_result as $row) {
+           //get gpa score
+	    $service_gpa_score = $row->gpa_score;
+	   }
+	}//end if for data check
+
+
+    //***************METRICS TABLE - BENCHMARKS, STATUS, GOALS ETC***************
+
+    //Pull status color metrics from company_x_status_color_metric table
+   	$query_status_color_metrics = db_select('company_x_status_color_metric', 'g') //db table name and alias
+    ->fields('g', array('id','status_color_measure','status_color_metric'));  //table name, then field(s)
+	$results_status_color_metrics = $query_status_color_metrics->execute();
+
+   //Cycle through the records and assign the data to variables
+   foreach ($results_status_color_metrics as $result)
+	{
+		$status_color_metric = $result->status_color_metric;
+	}
+
+	//get performance metrics from company_x_benchmark_metrics table
+	$query_metrics = db_select('company_x_benchmark_metrics', 'g') //db table name and alias
+    ->fields('g', array('id','performance_metric','goal_score','benchmark_score'));  //table name, then field(s)
+	$results_metrics = $query_metrics->execute();
+
+    //Cycle through the records and assign the data to variables
+	$performance_metrics = array();
+	$goal_scores = array();
+	$benchmark_scores = array();
+	foreach ($results_metrics as $row)
+	{
+		$performance_metrics[$row->id] = $row->performance_metric;
+		$goal_scores[$row->id] = $row->goal_score;
+		$benchmark_scores[$row->id] = $row->benchmark_score;
+	}
+
+	for($i=1; $i <= 7; $i++) {
+        ${'performance_metric_' . $i} = $performance_metrics[$i];
+	${'goal_score_' . $i} = $goal_scores[$i];
+	${'benchmark_score_' . $i} = $benchmark_scores[$i];
+	}
+
+	//Calculate number of scars per month.  If there is not any data in the quality file then set everything to N/D
+	if($quality_gpa_score == "N/D"){
+          $quality_scars_issued_per_month = "N/D";
+
+	  $quality_coa_on_time = "N/D";
+	  $quality_coa_on_time_month_0 = "N/D";
+	  $quality_coa_on_time_month_1 = "N/D";
+	  $quality_coa_on_time_month_2 = "N/D";
+	  $quality_coa_on_time_month_3 = "N/D";
+
+	  $quality_scars_closure_rate = "N/D";
+          $quality_scars_closure_rate_month_0 = "N/D";
+	  $quality_scars_closure_rate_month_1 = "N/D";
+	  $quality_scars_closure_rate_month_2 = "N/D";
+	  $quality_scars_closure_rate_month_3 = "N/D";
+
+	}
+	else{
+
+	  if ($search_year < $current_year) {
+	  $quality_scars_months = 12;
+	  }
+	  else {
+	  $quality_scars_months = $current_month;
+	  }
+
+	  $quality_scars_issued_per_month = round(($quality_sum_scars/$quality_scars_months),1);//$quality_sum_scars defined in Quality GPA section. Also scars issued for the individual month is in Quality GPA section
+
+	  //Calculate the COA on time percentage. $quality_coa_on_time_records defined in Quality GPA section
+	  //YTD
+	  $quality_coa_on_time = round(($quality_sum_coa_on_time/$quality_total_number_pos * 100),1);
+
+	  //Month 0
+	  //If there are no records for month assign N/A
+	  if(empty($quality_total_number_pos_month_0)){
+		$quality_coa_on_time_month_0 = "N/A";
+	  }
+	  else{
+	  $quality_coa_on_time_month_0 = round(($quality_sum_coa_on_time_month_0/$quality_total_number_pos_month_0 * 100),1);
+	  }
+
+	  //Month 1
+	  //If there are no records for month assign N/A
+	  if(empty($quality_total_number_pos_month_1)){
+		$quality_coa_on_time_month_1 = "N/A";
+	  }
+	  else{
+	  $quality_coa_on_time_month_1 = round(($quality_sum_coa_on_time_month_1/$quality_total_number_pos_month_1 * 100),1);
+	  }
+
+	  //Month 2
+	  //If there are no records for month assign N/A
+	  if(empty($quality_total_number_pos_month_2)){
+		$quality_coa_on_time_month_2 = "N/A";
+	  }
+	  else{
+	  $quality_coa_on_time_month_2 = round(($quality_sum_coa_on_time_month_2/$quality_total_number_pos_month_2 * 100),1);
+	  }
+
+	  //Month 3
+	  //If there are no records for month assign N/A
+	  if(empty($quality_total_number_pos_month_3)){
+		$quality_coa_on_time_month_3 = "N/A";
+	  }
+	  else{
+	  $quality_coa_on_time_month_3 = round(($quality_sum_coa_on_time_month_3/$quality_total_number_pos_month_3 * 100),1);
+	  }
+
+	  //Calculate the scars closure rate.  If there aren't any scars we set it to N/A
+	  //YTD
+
+	  if (empty($quality_sum_scars)){
+		 $quality_scars_closure_rate = "N/A";
+	  }
+	  else {
+		 $quality_scars_closure_rate = round(($quality_sum_scars_closed/$quality_sum_scars * 100),1);
+	  }
+
+	  //Month 0
+	  //If there aren't any scars we set it to N/A
+	  if (empty($quality_sum_scars_month_0)){
+		 $quality_scars_closure_rate_month_0 = "N/A";
+	  }
+	  else {
+		 $quality_scars_closure_rate_month_0 = round(($quality_sum_scars_closed_month_0/$quality_sum_scars_month_0 * 100),1);
+	  }
+
+	  //Month 1
+	  //If there aren't any scars we set it to N/A
+	  if (empty($quality_sum_scars_month_1)){
+		 $quality_scars_closure_rate_month_1 = "N/A";
+	  }
+	  else {
+		 $quality_scars_closure_rate_month_1 = round(($quality_sum_scars_closed_month_1/$quality_sum_scars_month_1 * 100),1);
+	  }
+
+	  //Month 2
+	  //If there aren't any scars we set it to N/A
+	  if (empty($quality_sum_scars_month_2)){
+		 $quality_scars_closure_rate_month_2 = "N/A";
+	  }
+	  else {
+		 $quality_scars_closure_rate_month_2 = round(($quality_sum_scars_closed_month_2/$quality_sum_scars_month_2 * 100),1);
+	  }
+
+	  //Month 3
+	  //If there aren't any scars we set it to N/A
+	  if (empty($quality_sum_scars_month_3)){
+		 $quality_scars_closure_rate_month_3 = "N/A";
+	  }
+	  else {
+		 $quality_scars_closure_rate_month_3 = round(($quality_sum_scars_closed_month_3/$quality_sum_scars_month_3 * 100),1);
+	  }
+	}//end if used to check for data in quality table before it figured out SCAR
+
+	//Calculate trends
+	//Metric 1
+	//YTD
+	//Make the trend NA if there is no data associated with the calculation
+	if($quality_gpa_score == "N/D"){
+	  $trend_metric_1_fy = "N/D";
+	  $trend_metric_1_month_1 = "N/D";
+	  $trend_metric_1_month_2 = "N/D";
+	  $trend_metric_1_month_3 = "N/D";
+	}
+	else{
+	  //ytd
+	  if ($quality_coa_in_specification > $benchmark_score_3){
+		$trend_metric_1_fy = '<div id="icon_favorable"></div>';
+	  }
+	  else if ($quality_coa_in_specification == $benchmark_score_3){
+		$trend_metric_1_fy = '<div id="icon_flat"></div>';
+	  }
+	  else {
+		$trend_metric_1_fy = '<div id="icon_unfavorable"></div>';
+	  }
+
+	  //Month 1 - based off of month 0
+	  //Make the trend flat if there is no data for the month
+	  if ($quality_coa_in_specification_month_1 == "N/A"){
+		$trend_metric_1_month_1 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($quality_coa_in_specification_month_1 > $quality_coa_in_specification_month_0){
+		  $trend_metric_1_month_1 = '<div id="icon_favorable"></div>';
+		}
+		else if ($quality_coa_in_specification_month_1 == $quality_coa_in_specification_month_0){
+		  $trend_metric_1_month_1 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_1_month_1 = '<div id="icon_unfavorable"></div>';
+		}
+	  }
+
+	  //Month 2
+	  //Make the trend flat if there is no data for the month
+	  if ($quality_coa_in_specification_month_2 == "N/A"){
+		$trend_metric_1_month_2 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($quality_coa_in_specification_month_2 > $quality_coa_in_specification_month_1){
+		  $trend_metric_1_month_2 = '<div id="icon_favorable"></div>';
+		}
+		else if ($quality_coa_in_specification_month_2 == $quality_coa_in_specification_month_1){
+		  $trend_metric_1_month_2 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_1_month_2 = '<div id="icon_unfavorable"></div>';
+		}
+	  }
+
+	  //Month 3
+	  //Make the trend flat if there is no data for the month
+	  if ($quality_coa_in_specification_month_3 == "N/A"){
+		$trend_metric_1_month_3 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($quality_coa_in_specification_month_3 > $quality_coa_in_specification_month_2){
+		  $trend_metric_1_month_3 = '<div id="icon_favorable"></div>';
+		}
+		else if ($quality_coa_in_specification_month_3 == $quality_coa_in_specification_month_2){
+		  $trend_metric_1_month_3 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_1_month_3 = '<div id="icon_unfavorable"></div>';
+		}
+	  }
+	}//end N/D check
+
+	//Metric 2
+	//Make the trend NA if there is no data associated with the calculation
+	if($quality_gpa_score == "N/D"){
+	  $trend_metric_2_fy = "N/D";
+	  $trend_metric_2_month_1 = "N/D";
+	  $trend_metric_2_month_2 = "N/D";
+	  $trend_metric_2_month_3 = "N/D";
+	}
+	else{
+	  //YTD
+	  if ($quality_scars_issued_per_month > $benchmark_score_4){
+		$trend_metric_2_fy = '<div id="icon_unfavorable"></div>';
+	  }
+	  else if ($quality_scars_issued_per_month == $benchmark_score_4){
+		$trend_metric_2_fy = '<div id="icon_flat"></div>';
+	  }
+	  else {
+		$trend_metric_2_fy = '<div id="icon_favorable"></div>';
+	  }
+
+	  //Month 1 - based off of month 0
+	  //Make the trend flat if there is no data for the month
+	  if ($quality_sum_scars_month_1 == "N/A"){
+		$trend_metric_2_month_1 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($quality_sum_scars_month_1 > $quality_sum_scars_month_0){
+		  $trend_metric_2_month_1 = '<div id="icon_unfavorable"></div>';
+		}
+		else if ($quality_sum_scars_month_1 == $quality_sum_scars_month_0){
+		  $trend_metric_2_month_1 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_2_month_1 = '<div id="icon_favorable"></div>';
+		}
+	  }
+
+	  //Month 2
+	  //Make the trend flat if there is no data for the month
+	  if ($quality_sum_scars_month_2 == "N/A"){
+		$trend_metric_2_month_2 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($quality_sum_scars_month_2 > $quality_sum_scars_month_1){
+		  $trend_metric_2_month_2 = '<div id="icon_unfavorable"></div>';
+		}
+		else if ($quality_sum_scars_month_2 == $quality_sum_scars_month_1){
+		  $trend_metric_2_month_2 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_2_month_2 = '<div id="icon_favorable"></div>';
+		}
+	  }
+
+	  //Month 3
+	  //Make the trend flat if there is no data for the month
+	  if ($quality_sum_scars_month_3 == "N/A"){
+		$trend_metric_2_month_3 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($quality_sum_scars_month_3 > $quality_sum_scars_month_2){
+		  $trend_metric_2_month_3 = '<div id="icon_unfavorable"></div>';
+		}
+		else if ($quality_sum_scars_month_3 == $quality_sum_scars_month_2){
+		  $trend_metric_2_month_3 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_2_month_3 = '<div id="icon_favorable"></div>';
+		}
+	  }
+	}//end N/D check
+
+	//Metric 3
+	//Make the trend NA if there is no data associated with the calculation
+	if($delivery_gpa_score == "N/D"){
+	  $trend_metric_3_fy = "N/D";
+	  $trend_metric_3_month_1 = "N/D";
+	  $trend_metric_3_month_2 = "N/D";
+	  $trend_metric_3_month_3 = "N/D";
+	}
+	else{
+	  //YTD
+	  if ($delivery_on_time > $benchmark_score_1){
+		$trend_metric_3_fy = '<div id="icon_favorable"></div>';
+	  }
+	  else if ($delivery_on_time == $benchmark_score_1){
+		$trend_metric_3_fy = '<div id="icon_flat"></div>';
+	  }
+	  else {
+		$trend_metric_3_fy = '<div id="icon_unfavorable"></div>';
+	  }
+
+	  //Month 1 - based off month 0
+	  //Make the trend flat if there is no data for the month
+	  if ($delivery_on_time_month_1 == "N/A"){
+		$trend_metric_3_month_1 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($delivery_on_time_month_1 > $delivery_on_time_month_0){
+		  $trend_metric_3_month_1 = '<div id="icon_favorable"></div>';
+		}
+		else if ($delivery_on_time_month_1 == $delivery_on_time_month_0){
+		  $trend_metric_3_month_1 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_3_month_1 = '<div id="icon_unfavorable"></div>';
+		}
+	  }
+
+	  //Month 2
+	  //Make the trend flat if there is no data for the month
+	  if ($delivery_on_time_month_2 == "N/A"){
+		$trend_metric_3_month_2 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($delivery_on_time_month_2 > $delivery_on_time_month_1){
+		  $trend_metric_3_month_2 = '<div id="icon_favorable"></div>';
+		}
+		else if ($delivery_on_time_month_2 == $delivery_on_time_month_1){
+		  $trend_metric_3_month_2 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_3_month_2 = '<div id="icon_unfavorable"></div>';
+		}
+	  }
+
+      //Month 3
+	  //Make the trend flat if there is no data for the month
+	  if ($delivery_on_time_month_3 == "N/A"){
+		$trend_metric_3_month_3 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($delivery_on_time_month_3 > $delivery_on_time_month_2){
+		  $trend_metric_3_month_3 = '<div id="icon_favorable"></div>';
+		}
+		else if ($delivery_on_time_month_3 == $delivery_on_time_month_2){
+		  $trend_metric_3_month_3 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_3_month_3 = '<div id="icon_unfavorable"></div>';
+		}
+	  }
+	}//end N/D check
+
+	//Metric 4
+	//Make the trend NA if there is no data associated with the calculation
+	if($quality_gpa_score == "N/D"){
+	  $trend_metric_4_fy = "N/D";
+	  $trend_metric_4_month_1 = "N/D";
+	  $trend_metric_4_month_2 = "N/D";
+	  $trend_metric_4_month_3 = "N/D";
+	}
+	else{
+	  //YTD
+	  if ($quality_coa_on_time > $benchmark_score_2){
+		$trend_metric_4_fy = '<div id="icon_favorable"></div>';
+	  }
+	  else if ($quality_coa_on_time == $benchmark_score_2){
+		$trend_metric_4_fy = '<div id="icon_flat"></div>';
+	  }
+	  else {
+		$trend_metric_4_fy = '<div id="icon_unfavorable"></div>';
+	  }
+
+	  //Month 1 - based off month 0
+	  //Make the trend flat if there is no data for the month
+	  if ($quality_coa_on_time_month_1 == "N/A"){
+		$trend_metric_4_month_1 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($quality_coa_on_time_month_1 > $quality_coa_on_time_month_0){
+		  $trend_metric_4_month_1 = '<div id="icon_favorable"></div>';
+		}
+		else if ($quality_coa_on_time_month_1 == $quality_coa_on_time_month_0){
+		  $trend_metric_4_month_1 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_4_month_1 = '<div id="icon_unfavorable"></div>';
+		}
+	  }
+
+	  //Month 2
+	  //Make the trend flat if there is no data for the month
+	  if ($quality_coa_on_time_month_2 == "N/A"){
+		$trend_metric_4_month_2 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($quality_coa_on_time_month_2 > $quality_coa_on_time_month_1){
+		  $trend_metric_4_month_2 = '<div id="icon_favorable"></div>';
+		}
+		else if ($quality_coa_on_time_month_2 == $quality_coa_on_time_month_1){
+		  $trend_metric_4_month_2 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_4_month_2 = '<div id="icon_unfavorable"></div>';
+		}
+	  }
+
+	  //Month 3
+	  //Make the trend flat if there is no data for the month
+	  if ($quality_coa_on_time_month_3 == "N/A"){
+		$trend_metric_4_month_3 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($quality_coa_on_time_month_3 > $quality_coa_on_time_month_2){
+		  $trend_metric_4_month_3 = '<div id="icon_favorable"></div>';
+		}
+		else if ($quality_coa_on_time_month_3 == $quality_coa_on_time_month_2){
+		  $trend_metric_4_month_3 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_4_month_3 = '<div id="icon_unfavorable"></div>';
+		}
+	  }
+	}//end N/D check
+
+	//Metric 5
+	//Make the trend NA if there is no data associated with the calculation
+	if($quality_gpa_score == "N/D"){
+	  $trend_metric_5_fy = "N/D";
+	  $trend_metric_5_month_1 = "N/D";
+	  $trend_metric_5_month_2 = "N/D";
+	  $trend_metric_5_month_3 = "N/D";
+	}
+	else{
+	  //YTD
+	  //Make the trend flat if there is no data for the fy
+	  if ($quality_scars_closure_rate == "N/A"){
+		$trend_metric_5_fy = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($quality_scars_closure_rate > $benchmark_score_5){
+		  $trend_metric_5_fy = '<div id="icon_favorable"></div>';
+		}
+		else if ($quality_scars_closure_rate == $benchmark_score_5){
+		  $trend_metric_5_fy = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_5_fy = '<div id="icon_unfavorable"></div>';
+		}
+	  }
+
+	  //Month 1 - based off month 0
+	  //Make the trend flat if there is no data for the month
+	  if ($quality_scars_closure_rate_month_1 == "N/A"){
+		$trend_metric_5_month_1 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($quality_scars_closure_rate_month_1 > $quality_scars_closure_rate_month_0){
+		  $trend_metric_5_month_1 = '<div id="icon_favorable"></div>';
+		}
+		else if ($quality_scars_closure_rate_month_1 == $quality_scars_closure_rate_month_0){
+		  $trend_metric_5_month_1 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_5_month_1 = '<div id="icon_unfavorable"></div>';
+		}
+	  }
+
+	  //Month 2
+	  //Make the trend flat if there is no data for the month
+	  if ($quality_scars_closure_rate_month_2 == "N/A"){
+		$trend_metric_5_month_2 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($quality_scars_closure_rate_month_2 > $quality_scars_closure_rate_month_1){
+		  $trend_metric_5_month_2 = '<div id="icon_favorable"></div>';
+		}
+		else if ($quality_scars_closure_rate_month_2 == $quality_scars_closure_rate_month_1){
+		  $trend_metric_5_month_2 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_5_month_2 = '<div id="icon_unfavorable"></div>';
+		}
+	  }
+
+	  //Month 3
+	  //Make the trend flat if there is no data for the month
+	  if ($quality_scars_closure_rate_month_3 == "N/A"){
+		$trend_metric_5_month_3 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($quality_scars_closure_rate_month_3 > $quality_scars_closure_rate_month_2){
+		  $trend_metric_5_month_3 = '<div id="icon_favorable"></div>';
+		}
+		else if ($quality_scars_closure_rate_month_3 == $quality_scars_closure_rate_month_2){
+		  $trend_metric_5_month_3 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_5_month_3 = '<div id="icon_unfavorable"></div>';
+		}
+	  }
+	}//end N/D check
+
+	//Metric 6
+	//Make the trend NA if there is no data associated with the calculation
+	if($service_gpa_score == "N/D"){
+	  $trend_metric_6_fy = "N/D";
+	  $trend_metric_6_month_1 = "N/D";
+	  $trend_metric_6_month_2 = "N/D";
+	  $trend_metric_6_month_3 = "N/D";
+	}
+	else{
+	  //YTD
+	  if ($service_rating > $benchmark_score_6){
+		$trend_metric_6_fy = '<div id="icon_favorable"></div>';
+	  }
+	  else if ($service_rating == $benchmark_score_6){
+		$trend_metric_6_fy = '<div id="icon_flat"></div>';
+	  }
+	  else {
+		$trend_metric_6_fy = '<div id="icon_unfavorable"></div>';
+	 }
+
+	  //Month 1 - based off month 0
+	  //Make the trend flat if there is no data for the month
+	  if ($service_rating_month_1 == "N/A"){
+		$trend_metric_6_month_1 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($service_rating_month_1 > $service_rating_month_0){
+		  $trend_metric_6_month_1 = '<div id="icon_favorable"></div>';
+		}
+		else if ($service_rating_month_1 == $service_rating_month_0){
+		  $trend_metric_6_month_1 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_6_month_1 = '<div id="icon_unfavorable"></div>';
+		}
+	  }
+
+	  //Month 2
+	  //Make the trend flat if there is no data for the month
+	  if ($service_rating_month_2 == "N/A"){
+		$trend_metric_6_month_2 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($service_rating_month_2 > $service_rating_month_1){
+		  $trend_metric_6_month_2 = '<div id="icon_favorable"></div>';
+		}
+		else if ($service_rating_month_2 == $service_rating_month_1){
+		  $trend_metric_6_month_2 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_6_month_2 = '<div id="icon_unfavorable"></div>';
+		}
+	  }
+
+	  //Month 3
+	  //Make the trend flat if there is no data for the month
+	  if ($service_rating_month_3 == "N/A"){
+		$trend_metric_6_month_3 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($service_rating_month_3 > $service_rating_month_2){
+		  $trend_metric_6_month_3 = '<div id="icon_favorable"></div>';
+		}
+		else if ($service_rating_month_3 == $service_rating_month_2){
+		  $trend_metric_6_month_3 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_6_month_3 = '<div id="icon_unfavorable"></div>';
+		}
+	  }
+	}//end N/D check
+
+        //Metric 7
+	//Make the trend NA if there is no data associated with the calculation
+	if($delivery_gpa_score == "N/D"){
+	  $trend_metric_7_fy = "N/D";
+	  $trend_metric_7_month_1 = "N/D";
+	  $trend_metric_7_month_2 = "N/D";
+	  $trend_metric_7_month_3 = "N/D";
+	}
+	else{
+	  //YTD
+	  if ($packing_slip_accuracy > $benchmark_score_7){
+		$trend_metric_7_fy = '<div id="icon_favorable"></div>';
+	  }
+	  else if ($packing_slip_accuracy == $benchmark_score_7){
+		$trend_metric_7_fy = '<div id="icon_flat"></div>';
+	  }
+	  else {
+		$trend_metric_7_fy = '<div id="icon_unfavorable"></div>';
+	 }
+
+	  //Month 1 - based off month 0
+	  //Make the trend flat if there is no data for the month
+	  if ($packing_slip_accuracy_month_1 == "N/A"){
+		$trend_metric_7_month_1 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($packing_slip_accuracy_month_1 > $packing_slip_accuracy_month_0){
+		  $trend_metric_7_month_1 = '<div id="icon_favorable"></div>';
+		}
+		else if ($packing_slip_accuracy_month_1 == $packing_slip_accuracy_month_0){
+		  $trend_metric_7_month_1 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_7_month_1 = '<div id="icon_unfavorable"></div>';
+		}
+	  }
+
+	  //Month 2
+	  //Make the trend flat if there is no data for the month
+	  if ($packing_slip_accuracy_month_2 == "N/A"){
+		$trend_metric_7_month_2 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($packing_slip_accuracy_month_2 > $packing_slip_accuracy_month_1){
+		  $trend_metric_7_month_2 = '<div id="icon_favorable"></div>';
+		}
+		else if ($packing_slip_accuracy_month_2 == $packing_slip_accuracy_month_1){
+		  $trend_metric_7_month_2 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_7_month_2 = '<div id="icon_unfavorable"></div>';
+		}
+	  }
+
+	  //Month 3
+	  //Make the trend flat if there is no data for the month
+	  if ($packing_slip_accuracy_month_3 == "N/A"){
+		$trend_metric_7_month_3 = '<div id="icon_flat"></div>';
+	  }
+	  else{
+		if ($packing_slip_accuracy_month_3 > $packing_slip_accuracy_month_2){
+		  $trend_metric_7_month_3 = '<div id="icon_favorable"></div>';
+		}
+		else if ($packing_slip_accuracy_month_3 == $packing_slip_accuracy_month_2){
+		  $trend_metric_7_month_3 = '<div id="icon_flat"></div>';
+		}
+		else {
+		  $trend_metric_7_month_3 = '<div id="icon_unfavorable"></div>';
+		}
+	  }
+	}//end N/D check
+
+	//Calculate status
+	//Metric 1
+	//Make the status gray if there is no data for the year
+	if($quality_gpa_score == "N/D"){
+		$status_metric_1_fy = "status_gray";
+		$status_metric_1_month_1 = "status_gray";
+		$status_metric_1_month_2 = "status_gray";
+		$status_metric_1_month_3 = "status_gray";
+	}
+	else{
+	  //YTD
+	  if ($quality_coa_in_specification >= $goal_score_3){
+	  	$status_metric_1_fy = "status_green";
+	  }
+	  else if ($quality_coa_in_specification < ($goal_score_3 - $status_color_metric)){
+		$status_metric_1_fy = "status_red";
+	  }
+	  else {
+		$status_metric_1_fy = "status_yellow";
+	  }
+
+	  //Month 1
+	  //Make the status gray if there is no data for the month
+	  if ($quality_coa_in_specification_month_1 == "N/A"){
+		$status_metric_1_month_1 = "status_gray";
+	  }
+	  else{
+		if ($quality_coa_in_specification_month_1 >= $goal_score_3){
+		  $status_metric_1_month_1 = "status_green";
+		}
+		else if ($quality_coa_in_specification_month_1 < ($goal_score_3 - $status_color_metric)){
+		  $status_metric_1_month_1 = "status_red";
+		}
+		else {
+		  $status_metric_1_month_1 = "status_yellow";
+		}
+	  }
+
+	  //Month 2
+	  //Make the status gray if there is no data for the month
+	  if ($quality_coa_in_specification_month_2 == "N/A"){
+		$status_metric_1_month_2 = "status_gray";
+	  }
+	  else{
+		if ($quality_coa_in_specification_month_2 >= $goal_score_3){
+		  $status_metric_1_month_2 = "status_green";
+		}
+		else if ($quality_coa_in_specification_month_1 < ($goal_score_3 - $status_color_metric)){
+		  $status_metric_1_month_2 = "status_red";
+		}
+		else {
+		  $status_metric_1_month_2 = "status_yellow";
+		}
+	  }
+
+	  //Month 3
+	  //Make the status gray if there is no data for the month
+	  if ($quality_coa_in_specification_month_3 == "N/A"){
+		$status_metric_1_month_3 = "status_gray";
+	  }
+	  else{
+		if ($quality_coa_in_specification_month_3 >= $goal_score_3){
+		  $status_metric_1_month_3 = "status_green";
+		}
+		else if ($quality_coa_in_specification_month_3 < ($goal_score_3 - $status_color_metric)){
+		  $status_metric_1_month_3 = "status_red";
+		}
+		else {
+		  $status_metric_1_month_3 = "status_yellow";
+		}
+	  }
+	}////end N/D check
+
+	//Metric 2
+	//Make the status gray if there is no data for the year
+	if($quality_gpa_score == "N/D"){
+	  $status_metric_2_fy = "status_gray";
+	  $status_metric_2_month_1 = "status_gray";
+	  $status_metric_2_month_2 = "status_gray";
+	  $status_metric_2_month_3 = "status_gray";
+	}
+	else{
+	  //YTD
+	  if ($quality_scars_issued_per_month >= ($goal_score_4 + $status_color_metric)){
+		$status_metric_2_fy = "status_red";
+	  }
+	  else if ($quality_scars_issued_per_month <= $goal_score_4){
+		$status_metric_2_fy = "status_green";
+	  }
+	  else {
+		$status_metric_2_fy = "status_yellow";
+	  }
+
+	  //Month 1
+	  //Make the status gray if there is no data for the month
+	  if ($quality_sum_scars_month_1 == "N/A"){
+		$status_metric_2_month_1 = "status_gray";
+	  }
+	  else{
+		if ($quality_sum_scars_month_1 >= ($goal_score_4 + $status_color_metric)){
+		  $status_metric_2_month_1 = "status_red";
+		}
+		else if ($quality_sum_scars_month_1 <= $goal_score_4){
+		  $status_metric_2_month_1 = "status_green";
+		}
+		else {
+		  $status_metric_2_month_1 = "status_yellow";
+		}
+	  }
+
+	  //Month 2
+	  //Make the status gray if there is no data for the month
+	  if ($quality_sum_scars_month_2 == "N/A"){
+		$status_metric_2_month_2 = "status_gray";
+	  }
+	  else{
+		if ($quality_sum_scars_month_2 >= ($goal_score_4 + $status_color_metric)){
+		  $status_metric_2_month_2 = "status_red";
+		}
+		else if ($quality_sum_scars_month_2 <= $goal_score_4){
+		  $status_metric_2_month_2 = "status_green";
+		}
+		else {
+		  $status_metric_2_month_2 = "status_yellow";
+		}
+	  }
+
+	  //Month 3
+	  //Make the status gray if there is no data for the month
+	  if ($quality_sum_scars_month_3 == "N/A"){
+		$status_metric_2_month_3 = "status_gray";
+	  }
+	  else{
+		if ($quality_sum_scars_month_3 >= ($goal_score_4 + $status_color_metric)){
+		  $status_metric_2_month_3 = "status_red";
+		}
+		else if ($quality_sum_scars_month_3 <= $goal_score_4){
+		  $status_metric_2_month_3 = "status_green";
+		}
+		else {
+		  $status_metric_2_month_3 = "status_yellow";
+		}
+	  }
+	}//end N/D check
+
+	//Metric 3
+	//Make the status gray if there is no data for the year
+	if($delivery_gpa_score == "N/D"){
+	  $status_metric_3_fy = "status_gray";
+	  $status_metric_3_month_1 = "status_gray";
+	  $status_metric_3_month_2 = "status_gray";
+	  $status_metric_3_month_3 = "status_gray";
+	}
+	else{
+	  //YTD
+	  if ($delivery_on_time >= $goal_score_1){
+		$status_metric_3_fy = "status_green";
+	  }
+	  else if ($delivery_on_time < ($goal_score_1 - $status_color_metric)){
+		$status_metric_3_fy = "status_red";
+	  }
+	  else {
+		$status_metric_3_fy = "status_yellow";
+	  }
+
+	  //Month 1
+	  //Make the status gray if there is no data for the month
+	  if ($delivery_on_time_month_1 == "N/A"){
+		$status_metric_3_month_1 = "status_gray";
+	  }
+	  else{
+		if ($delivery_on_time_month_1 >= $goal_score_1){
+		  $status_metric_3_month_1 = "status_green";
+		}
+		else if ($delivery_on_time_month_1 < ($goal_score_1 - $status_color_metric)){
+		  $status_metric_3_month_1 = "status_red";
+		}
+		else {
+		  $status_metric_3_month_1 = "status_yellow";
+		}
+	  }
+
+	  //Month 2
+	  //Make the status gray if there is no data for the month
+	  if ($delivery_on_time_month_2 == "N/A"){
+		$status_metric_3_month_2 = "status_gray";
+	  }
+		else{
+		if ($delivery_on_time_month_2 >= $goal_score_1){
+		  $status_metric_3_month_2 = "status_green";
+		}
+		else if ($delivery_on_time_month_2 < ($goal_score_1 - $status_color_metric)){
+		  $status_metric_3_month_2 = "status_red";
+		}
+		else {
+		  $status_metric_3_month_2 = "status_yellow";
+		}
+	  }
+
+	  //Month 3
+	  //Make the status gray if there is no data for the month
+	  if ($delivery_on_time_month_3 == "N/A"){
+		$status_metric_3_month_3 = "status_gray";
+	  }
+	  else{
+		if ($delivery_on_time_month_3 >= $goal_score_1){
+		  $status_metric_3_month_3 = "status_green";
+		}
+		else if ($delivery_on_time_month_3 < ($goal_score_1 - $status_color_metric)){
+		  $status_metric_3_month_3 = "status_red";
+		}
+		else {
+		  $status_metric_3_month_3 = "status_yellow";
+		}
+	  }
+	}//end N/D check
+
+	//Metric 4
+	//Make the status gray if there is no data for the year
+	if($quality_gpa_score == "N/D"){
+	  $status_metric_4_fy = "status_gray";
+	  $status_metric_4_month_1 = "status_gray";
+	  $status_metric_4_month_2 = "status_gray";
+	  $status_metric_4_month_3 = "status_gray";
+	}
+	else{
+	  //YTD
+	  if ($quality_coa_on_time >= $goal_score_2){
+		$status_metric_4_fy = "status_green";
+	  }
+	  else if ($quality_coa_on_time < ($goal_score_2 - $status_color_metric)){
+		$status_metric_4_fy = "status_red";
+	  }
+	  else {
+		$status_metric_4_fy = "status_yellow";
+	  }
+
+	  //Month 1
+	  //Make the status gray if there is no data for the month
+	  if ($quality_coa_on_time_month_1 == "N/A"){
+		$status_metric_4_month_1 = "status_gray";
+	  }
+	  else{
+		if ($quality_coa_on_time_month_1 >= $goal_score_2){
+		  $status_metric_4_month_1 = "status_green";
+		}
+		else if ($quality_coa_on_time_month_1 < ($goal_score_2 - $status_color_metric)){
+		  $status_metric_4_month_1 = "status_red";
+		}
+		else {
+		  $status_metric_4_month_1 = "status_yellow";
+		}
+	  }
+
+	  //Month 2
+	  //Make the status gray if there is no data for the month
+	  if ($quality_coa_on_time_month_2 == "N/A"){
+		$status_metric_4_month_2 = "status_gray";
+	  }
+	  else{
+		if ($quality_coa_on_time_month_2 >= $goal_score_2){
+		  $status_metric_4_month_2 = "status_green";
+		}
+		else if ($quality_coa_on_time_month_2 < ($goal_score_2 - $status_color_metric)){
+		  $status_metric_4_month_2 = "status_red";
+		}
+		else {
+		  $status_metric_4_month_2 = "status_yellow";
+		}
+	  }
+
+	  //Month 3
+	  //Make the status gray if there is no data for the month
+	  if ($quality_coa_on_time_month_3 == "N/A"){
+		$status_metric_4_month_3 = "status_gray";
+	  }
+	  else{
+		if ($quality_coa_on_time_month_3 >= $goal_score_2){
+		  $status_metric_4_month_3 = "status_green";
+		}
+		else if ($quality_coa_on_time_month_3  < ($goal_score_2 - $status_color_metric)){
+		  $status_metric_4_month_3 = "status_red";
+		}
+		else {
+		  $status_metric_4_month_3 = "status_yellow";
+		}
+	  }
+	}//end N/D check
+
+	//Metric 5
+	//Make the status gray if there is no data for the year
+	if($quality_gpa_score == "N/D"){
+	  $status_metric_5_fy = "status_gray";
+	  $status_metric_5_month_1 = "status_gray";
+	  $status_metric_5_month_2 = "status_gray";
+	  $status_metric_5_month_3 = "status_gray";
+	}
+	else{
+      //YTD
+	  //Make the status gray if there is no data for the year
+	  if ($quality_scars_closure_rate === "N/A"){
+		$status_metric_5_fy = "status_gray";
+	  }
+	  else{
+		if ($quality_scars_closure_rate >= $goal_score_5){
+		  $status_metric_5_fy = "status_green";
+		}
+		else if ($quality_scars_closure_rate < ($goal_score_5 - $status_color_metric)){
+		  $status_metric_5_fy = "status_red";
+		}
+		else {
+		  $status_metric_5_fy = "status_yellow";
+		}
+	  }
+
+	  //Month 1
+	  //Make the status gray if there is no data for the month
+	  if ($quality_scars_closure_rate_month_1 == "N/A"){
+		$status_metric_5_month_1 = "status_gray";
+	  }
+	  else{
+		if ($quality_scars_closure_rate_month_1 >= $goal_score_5){
+		  $status_metric_5_month_1 = "status_green";
+		}
+		else if ($quality_scars_closure_rate_month_1 < ($goal_score_5 - $status_color_metric)){
+		  $status_metric_5_month_1 = "status_red";
+		}
+		else {
+		  $status_metric_5_month_1 = "status_yellow";
+		}
+	  }
+
+	  //Month 2
+	  //Make the status gray if there is no data for the month
+	  if ($quality_scars_closure_rate_month_2 == "N/A"){
+		$status_metric_5_month_2 = "status_gray";
+	  }
+	  else{
+		if ($quality_scars_closure_rate_month_2 >= $goal_score_5){
+		  $status_metric_5_month_2 = "status_green";
+		}
+		else if ($quality_scars_closure_rate_month_2 < ($goal_score_5 - $status_color_metric)){
+		  $status_metric_5_month_2 = "status_red";
+		}
+		else {
+		  $status_metric_5_month_2 = "status_yellow";
+		}
+	  }
+
+	  //Month 3
+	  //Make the status gray if there is no data for the month
+	  if ($quality_scars_closure_rate_month_3 == "N/A"){
+		$status_metric_5_month_3 = "status_gray";
+	  }
+	  else{
+		if ($quality_scars_closure_rate_month_3 >= $goal_score_5){
+		  $status_metric_5_month_3 = "status_green";
+		}
+		else if ($quality_scars_closure_rate_month_3 < ($goal_score_5 - $status_color_metric)){
+		  $status_metric_5_month_3 = "status_red";
+		}
+		else {
+		  $status_metric_5_month_3 = "status_yellow";
+		}
+	  }
+	}//end N/D check
+
+	//Metric 6
+	//Make the status gray if there is no data for the year
+	if($service_gpa_score == "N/D"){
+	  $status_metric_6_fy = "status_gray";
+	  $status_metric_6_month_1 = "status_gray";
+	  $status_metric_6_month_2 = "status_gray";
+	  $status_metric_6_month_3 = "status_gray";
+	}
+	else{
+	  //YTD
+	  if ($service_rating >= $goal_score_6){
+		$status_metric_6_fy = "status_green";
+	  }
+	  else if ($service_rating < ($goal_score_6 - $status_color_metric)){
+		$status_metric_6_fy = "status_red";
+	  }
+	  else {
+		$status_metric_6_fy = "status_yellow";
+	  }
+
+      //Month 1
+	  //Make the status gray if there is no data for the month
+	  if ($service_rating_month_1 == "N/A"){
+		$status_metric_6_month_1 = "status_gray";
+	  }
+	  else{
+		if ($service_rating_month_1 >= $goal_score_6){
+		  $status_metric_6_month_1 = "status_green";
+		}
+		else if ($service_rating_month_1 < ($goal_score_6 - $status_color_metric)){
+		  $status_metric_6_month_1 = "status_red";
+		}
+		else {
+		  $status_metric_6_month_1 = "status_yellow";
+		}
+	  }
+
+      //Month 2
+	  //Make the status gray if there is no data for the month
+	  if ($service_rating_month_2 == "N/A"){
+		$status_metric_6_month_2 = "status_gray";
+	  }
+	  else{
+		if ($service_rating_month_2 >= $goal_score_6){
+		  $status_metric_6_month_2 = "status_green";
+		}
+		else if ($service_rating_month_2 < ($goal_score_6 - $status_color_metric)){
+		  $status_metric_6_month_2 = "status_red";
+		}
+		else {
+		  $status_metric_6_month_2 = "status_yellow";
+		}
+	  }
+
+      //Month 3
+	  //Make the status gray if there is no data for the month
+	  if ($service_rating_month_3 == "N/A"){
+		$status_metric_6_month_3 = "status_gray";
+	  }
+	  else{
+		if ($service_rating_month_3 >= $goal_score_6){
+		  $status_metric_6_month_3 = "status_green";
+		}
+		else if ($service_rating_month_3 < ($goal_score_6 - $status_color_metric)){
+		  $status_metric_6_month_3 = "status_red";
+		}
+		else {
+		  $status_metric_6_month_3 = "status_yellow";
+		}
+	  }
+	}//end N/D check
+
+        //Metric 7
+	//Make the status gray if there is no data for the year
+	if($delivery_gpa_score == "N/D"){
+	  $status_metric_7_fy = "status_gray";
+	  $status_metric_7_month_1 = "status_gray";
+	  $status_metric_7_month_2 = "status_gray";
+	  $status_metric_7_month_3 = "status_gray";
+	}
+	else{
+	  //YTD
+	  if ($packing_slip_accuracy >= $goal_score_7){
+		$status_metric_7_fy = "status_green";
+	  }
+	  else if ($packing_slip_accuracy < ($goal_score_7 - $status_color_metric)){
+		$status_metric_7_fy = "status_red";
+	  }
+	  else {
+		$status_metric_7_fy = "status_yellow";
+	  }
+
+      //Month 1
+	  //Make the status gray if there is no data for the month
+	  if ($packing_slip_accuracy_month_1 == "N/A"){
+		$status_metric_7_month_1 = "status_gray";
+	  }
+	  else{
+		if ($packing_slip_accuracy_month_1 >= $goal_score_7){
+		  $status_metric_7_month_1 = "status_green";
+		}
+		else if ($packing_slip_accuracy_month_1 < ($goal_score_7 - $status_color_metric)){
+		  $status_metric_7_month_1 = "status_red";
+		}
+		else {
+		  $status_metric_7_month_1 = "status_yellow";
+		}
+	  }
+
+      //Month 2
+	  //Make the status gray if there is no data for the month
+	  if ($packing_slip_accuracy_month_2 == "N/A"){
+		$status_metric_7_month_2 = "status_gray";
+	  }
+	  else{
+		if ($packing_slip_accuracy_month_2 >= $goal_score_7){
+		  $status_metric_7_month_2 = "status_green";
+		}
+		else if ($packing_slip_accuracy_month_2 < ($goal_score_7 - $status_color_metric)){
+		  $status_metric_7_month_2 = "status_red";
+		}
+		else {
+		  $status_metric_7_month_2 = "status_yellow";
+		}
+	  }
+
+      //Month 3
+	  //Make the status gray if there is no data for the month
+	  if ($packing_slip_accuracy_month_3 == "N/A"){
+		$status_metric_7_month_3 = "status_gray";
+	  }
+	  else{
+		if ($packing_slip_accuracy_month_3 >= $goal_score_7){
+		  $status_metric_7_month_3 = "status_green";
+		}
+		else if ($packing_slip_accuracy_month_3 < ($goal_score_7 - $status_color_metric)){
+		  $status_metric_7_month_3 = "status_red";
+		}
+		else {
+		  $status_metric_7_month_3 = "status_yellow";
+		}
+	  }
+	}//end N/D check
+
+  //Get the GPA color from the company_x_gpa_colors table
+
+  $gpa_color_query = "SELECT * FROM {company_x_gpa_colors} WHERE :gpa BETWEEN gpa_min AND gpa_max";
+
+  //get quality gpa color
+  if($quality_gpa_score == "N/D"){
+	$quality_gpa_color = "gray";
+  }
+  else{
+    $quality_gpa_color_result = db_query($gpa_color_query, array(':gpa' => $quality_gpa_score));
+    foreach ($quality_gpa_color_result as $row) {
+    $quality_gpa_color = $row->gpa_color;
+    }
+  }
+
+  //get delivery gpa color
+  if($delivery_gpa_score == "N/D"){
+	$delivery_gpa_color = "gray";
+  }
+  else{
+    $delivery_gpa_color_result = db_query($gpa_color_query, array(':gpa' => $delivery_gpa_score));
+    foreach ($delivery_gpa_color_result as $row) {
+    $delivery_gpa_color = $row->gpa_color;
+    }
+  }
+
+  //get service gpa color
+  if($service_gpa_score == "N/D"){
+	$service_gpa_color = "gray";
+  }
+  else{
+    $service_gpa_color_result = db_query($gpa_color_query, array(':gpa' => $service_gpa_score));
+    foreach ($service_gpa_color_result as $row) {
+    $service_gpa_color = $row->gpa_color;
+    }
+  }
+
+    }//end of if statement to skip the filters and calculations if this is an existing scorecard.
+
+    //Reset drupal messages
+    drupal_get_messages();
+
+    //If this is called after the scorecard is submitted, show the save message.  This is done here since we are using a
+    //drupal_goto in submit to show the completed form and the user never sees the message if its in the submit function.
+    if($after_submit == "Yes")
+    {
+        //if the user came from another source (ie. scorecards due report) give them a quick link back
+        if ($source == 'due_report') //go to appropriately filtered scorecard due report
+        {
+            $message = 'The scorecard for ' . $display_name . ' has been successfully saved.' .
+            '&nbsp; &nbsp; &nbsp; <span class="beautytips" title="Return to the Scorecards Due Report"><a href="/scorecards_due_report/' . $filter_due_category . '/' . $filter_mill . '">' . '<img style="vertical-align:middle" src="/images/go_back_save.png"></span></a>';
+        }
+        elseif ($source == "Assessment") //compose assessment message
+        {
+            $message = 'The service assessment for ' . $display_name . ' has been successfully saved and appended below (if the date range corresponds to the selected scorecard year).  Click the save icon at the bottom of the page to save the completed scorecard.';
+            if (empty($filter_due_category))
+            {
+               $source = 'None';
+            }
+            else
+            {
+                $source = 'due_report';
+            }
+        }
+        else //default to scorecard list
+        {
+             $message = 'The scorecard for ' . $display_name . ' has been successfully saved.' .
+            '&nbsp; &nbsp; &nbsp; <span class="beautytips" title="Return to the list of Scorecards"><a href="/scorecard_list/' . $filter_mill . '/' . $filter_supplier . '/' . $filter_year . '">' . '<img style="vertical-align:middle" src="/images/go_back_save.png"></span></a>';
+
+            }//end checking for source
+        drupal_set_message($message, $type = 'status', $repeat = TRUE);
+    }
+    else
+    {
+        //I had to add this to account for users that originated from the due report, created an assessment from
+        //the scorecard, and then returned to scorecard.
+        if (!empty($filter_due_category))
+        {
+            $source = 'due_report';
+        }
+    }//end checking to see if this was called after a submit
+
+//  ********DISPLAY THE SCORECARD********
+  //GPA SECTION
+  $scorecard['gpa_wrapper_start'] = array(
+  '#markup' => '<div id="gpa_wrapper">'
+  );
+
+  //Only show the approved and provisional status if it is not a relationship
+  if ($is_this_a_relationship == "No")
+  {
+      if ($approved_status_answer == "YES" && $provisional_status_answer == "YES")
+      {
+          $line = '<div id="gpa_provisional_header">(Approved & Provisional)</div>';
+      }
+      elseif ($approved_status_answer == "YES" && (empty($provisional_status_answer) || $provisional_status_answer == "NO"))
+      {
+          $line = '<div id="gpa_provisional_header">(Approved)</div>';
+      }
+      elseif ((empty($approved_status_answer) || $approved_status_answer == "NO") && $provisional_status_answer=="YES")
+      {
+          $line = '<div id="gpa_provisional_header">(Provisional)</div>';
+      }
+      else
+      {
+          $line = "";
+      }
+  }
+  else
+  {
+      $line = "";
+  }
+
+ //If there is no supplier selected, hide the name and dates
+ if (!empty($supplier_year_selected)){
+  $scorecard['gpa_supplier_search'] = array(
+  '#markup' => '
+  <div id="gpa_supplier_header">' .$display_name. '</div>
+  <div id="gpa_provisional_header">' .$line. '</div>
+  <div id="gpa_date_header">' .$scorecard_start_date. ' - ' .$scorecard_end_date. '</div>'
+  );
+ }
+
+  $scorecard['gpa_circles_wrapper'] = array(
+  '#markup' => '<div id="gpa_circles_wrapper">',
+  );
+
+  //Display the correct quality color
+  $scorecard['gpa_quality_section'] = array(
+  '#markup' => $quality_gpa_score,
+  '#prefix' => '<div id="gpa_quality_' .$quality_gpa_color. '"><span class="beautytips" title="
+      Total POs: ' .$quality_total_number_pos. '<br>
+	  Total Approved: ' .$quality_total_approved_pos. '<br>
+	  COA in Spec: ' .$quality_coa_in_specification. '%<br>
+	  Total SCARS Issued: ' .$quality_sum_scars. '<br>
+	  Total SCARS Closed: ' .$quality_sum_scars_closed. '<br>
+	  SCARS Closure Rate: ' .$quality_scars_closure_rate. '%
+	  ">QUALITY<br>',
+  '#suffix' => '</span></div>'
+  );
+
+  //Container for embedded divs to do three columns
+  $scorecard['gpa_delivery_service_container'] = array(
+  '#markup' => '<div id="gpa_delivery_service_container">',
+  );
+
+  //Display the correct delivery color
+  $scorecard['gpa_delivery_section'] = array(
+  '#markup' => $delivery_gpa_score,
+  '#prefix' => '<div id="gpa_delivery_' .$delivery_gpa_color. '"><span class="beautytips" title="
+      Total POs: ' .$delivery_total_number_pos. '<br>
+	  Delivery on Time: ' .$delivery_on_time. '%<br>
+	  ">DELIVERY<br>',
+  '#suffix' => '</span></div>'
+  );
+
+  //Display the correct service color
+  $scorecard['gpa_service_section'] = array(
+  '#markup' => $service_gpa_score,
+  '#prefix' => '<div id="gpa_quality_' .$service_gpa_color. '"><span class="beautytips" title="
+      Total Supplier Points: ' .$total_score. '<br>
+	  Max Points: ' .$total_max_score. '<br>
+	  Service Rating: ' .$service_rating. '%<br>
+          Packing Slip Discrepancies: ' .$packing_slip_discrepancies_total. '<br>
+	  ">SERVICE<br>',
+  '#suffix' => '</span></div>'
+  );
+
+  //Close the gpa wrapper, circles wrapper, and the embedded divs container
+  $scorecard['gpa_close_divs'] = array(
+  '#markup' => '</div></div></div>',
+  );
+
+//DISPLAY SCORECARD BENCHMARKS, GOALS, TRENDS, AND SCORES
+
+  //Display Top Headings
+  $scorecard['calender_period_heading'] = array(
+  '#markup' => '',
+  '#prefix' => '<table id="metrics_analysis_table"><col style="width: 35%" /><col style="width: 5%" /><col style="width: 5%" /><col style="width: 5%" /><col style="width: 5%" /><col style="width: 5%" /><col style="width: 5%" /><col style="width: 5%" /><col style="width: 5%" /><col style="width: 5%" /><col style="width: 5%" /><col style="width: 5%" /><col style="width: 5%" /><col style="width: 5%" /><thead><tr><th>',
+  '#suffix' => '</th>'
+  );
+
+  $scorecard['previous_year_heading'] = array(
+  //'#markup' => 'FY'.$previous_year,
+  '#markup' => '',
+  '#prefix' => '<th align="middle">',
+  '#suffix' => '</th>',
+  );
+
+  $scorecard['fiscal_year_heading'] = array(
+  '#markup' => 'FY'.$search_year,
+  '#prefix' => '<th colspan="3" align="middle">',
+  '#suffix' => '</th>',
+  );
+
+  $scorecard['month_1_heading'] = array(
+  '#markup' => $previous_month_1_text,
+  '#prefix' => '<th colspan="3" align="middle">',
+  '#suffix' => '</th>',
+  );
+
+  $scorecard['month_2_heading'] = array(
+  '#markup' => $previous_month_2_text,
+  '#prefix' => '<th colspan="3" align="middle">',
+  '#suffix' => '</th>',
+  );
+
+  $scorecard['month_3_heading'] = array(
+  '#markup' => $previous_month_3_text,
+  '#prefix' => '<th colspan="3" align="middle">',
+  '#suffix' => '</th></tr>',
+  );
+
+  //Display Column Headings
+  $scorecard['fy_metric_heading'] = array(
+  '#markup' => 'Performance Metric',
+  '#prefix' => '<tr><th style="text-align:left">',
+  '#suffix' => '</th>'
+  );
+
+  $scorecard['fy_benchmark_heading'] = array(
+  '#markup' => 'Benchmark',
+  '#prefix' => '<th>',
+  '#suffix' => '</th>',
+  );
+
+  $scorecard['fy_goal_heading'] = array(
+  '#markup' => 'Goal',
+  '#prefix' => '<th>',
+  '#suffix' => '</th>',
+  );
+
+  $scorecard['fy_actual_ytd_heading'] = array(
+  '#markup' => 'Actual YTD',
+  '#prefix' => '<th>',
+  '#suffix' => '</th>',
+  );
+
+  $scorecard['fy_trend_heading'] = array(
+  '#markup' => 'Trend',
+  '#prefix' => '<th><span class="beautytips" title="Based off of benchmark">',
+  '#suffix' => '</span></th>',
+  );
+
+  $scorecard['month_1_goal_heading'] = array(
+  '#markup' => 'Goal',
+  '#prefix' => '<th>',
+  '#suffix' => '</th>',
+  );
+
+  $scorecard['month_1_actual_ytd_heading'] = array(
+  '#markup' => 'Actual',
+  '#prefix' => '<th>',
+  '#suffix' => '</th>',
+  );
+
+  $scorecard['month_1_trend_heading'] = array(
+  '#markup' => 'Trend',
+  '#prefix' => '<th><span class="beautytips" title="Based off of ' .$previous_month_0_text. '">',
+  '#suffix' => '</span></th>',
+  );
+
+  $scorecard['month_2_goal_heading'] = array(
+  '#markup' => 'Goal',
+  '#prefix' => '<th>',
+  '#suffix' => '</th>',
+  );
+
+  $scorecard['month_2_actual_ytd_heading'] = array(
+  '#markup' => 'Actual',
+  '#prefix' => '<th>',
+  '#suffix' => '</th>',
+  );
+
+  $scorecard['month_2_trend_heading'] = array(
+  '#markup' => 'Trend',
+  '#prefix' => '<th>',
+  '#suffix' => '</th>',
+  );
+
+  $scorecard['month_3_goal_heading'] = array(
+  '#markup' => 'Goal',
+  '#prefix' => '<th>',
+  '#suffix' => '</th>',
+  );
+
+  $scorecard['month_3_actual_ytd_heading'] = array(
+  '#markup' => 'Actual',
+  '#prefix' => '<th>',
+  '#suffix' => '</th>',
+  );
+
+  $scorecard['month_3_trend_heading'] = array(
+  '#markup' => 'Trend',
+  '#prefix' => '<th>',
+  '#suffix' => '</th></thead></tr>',
+  );
+
+  //Display Metric 1
+  $scorecard['metric_1_title'] = array(
+  '#markup' => $performance_metric_3,
+  '#prefix' => '<tr><td style="text-align:left">',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_1_benchmark'] = array(
+  '#markup' => $benchmark_score_3,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_1_fy_goal'] = array(
+  '#markup' => $goal_score_3,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_1_fy_actual_ytd'] = array(
+  '#markup' => $quality_coa_in_specification,
+  '#prefix' => '<td><div id="' .$status_metric_1_fy. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_1_fy_trend'] = array(
+  '#markup' => $trend_metric_1_fy,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_1_month_1_goal'] = array(
+  '#markup' => $goal_score_3,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_1_month_1_actual_ytd'] = array(
+  '#markup' => $quality_coa_in_specification_month_1,
+  '#prefix' => '<td><div id="' .$status_metric_1_month_1. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_1_month_1_trend'] = array(
+  '#markup' => $trend_metric_1_month_1,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_1_month_2_goal'] = array(
+  '#markup' => $goal_score_3,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_1_month_2_actual_ytd'] = array(
+  '#markup' => $quality_coa_in_specification_month_2,
+  '#prefix' => '<td><div id="' .$status_metric_1_month_2. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_1_month_2_trend'] = array(
+  '#markup' => $trend_metric_1_month_2,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_1_month_3_goal'] = array(
+  '#markup' => $goal_score_3,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_1_month_3_actual_ytd'] = array(
+  '#markup' => $quality_coa_in_specification_month_3,
+  '#prefix' => '<td><div id="' .$status_metric_1_month_3. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_1_month_3_trend'] = array(
+  '#markup' => $trend_metric_1_month_3,
+  '#prefix' => '<td>',
+  '#suffix' => '</td></tr>',
+  );
+
+  //Display Metric 2
+  $scorecard['metric_2_title'] = array(
+  '#markup' => $performance_metric_4,
+  '#prefix' => '<tr><td style="text-align:left">',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_2_benchmark'] = array(
+  '#markup' => $benchmark_score_4,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_2_fy_goal'] = array(
+  '#markup' => $goal_score_4,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_2_fy_actual_ytd'] = array(
+  '#markup' => $quality_scars_issued_per_month,
+  '#prefix' => '<td><div id="' .$status_metric_2_fy. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_2_fy_trend'] = array(
+  '#markup' => $trend_metric_2_fy,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_2_month_1_goal'] = array(
+  '#markup' => $goal_score_4,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_2_month_1_actual_ytd'] = array(
+  '#markup' => $quality_sum_scars_month_1,
+  '#prefix' => '<td><div id="' .$status_metric_2_month_1. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_2_month_1_trend'] = array(
+  '#markup' => $trend_metric_2_month_1,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_2_month_2_goal'] = array(
+  '#markup' => $goal_score_4,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_2_month_2_actual_ytd'] = array(
+  '#markup' => $quality_sum_scars_month_2,
+  '#prefix' => '<td><div id="' .$status_metric_2_month_2. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_2_month_2_trend'] = array(
+  '#markup' => $trend_metric_2_month_2,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_2_month_3_goal'] = array(
+  '#markup' => $goal_score_4,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_2_month_3_actual_ytd'] = array(
+  '#markup' => $quality_sum_scars_month_3,
+  '#prefix' => '<td><div id="' .$status_metric_2_month_3. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_2_month_3_trend'] = array(
+  '#markup' => $trend_metric_2_month_3,
+  '#prefix' => '<td>',
+  '#suffix' => '</td></tr>',
+  );
+
+  //Display Metric 3
+  $scorecard['metric_3_title'] = array(
+  '#markup' => $performance_metric_1,
+  '#prefix' => '<tr><td style="text-align:left">',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_3_benchmark'] = array(
+  '#markup' => $benchmark_score_1,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_3_fy_goal'] = array(
+  '#markup' => $goal_score_1,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_3_fy_actual_ytd'] = array(
+  '#markup' => $delivery_on_time,
+  '#prefix' => '<td><div id="' .$status_metric_3_fy. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_3_fy_trend'] = array(
+  '#markup' => $trend_metric_3_fy,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_3_month_1_goal'] = array(
+  '#markup' => $goal_score_1,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_3_month_1_actual_ytd'] = array(
+  '#markup' => $delivery_on_time_month_1,
+  '#prefix' => '<td><div id="' .$status_metric_3_month_1. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_3_month_1_trend'] = array(
+  '#markup' => $trend_metric_3_month_1,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_3_month_2_goal'] = array(
+  '#markup' => $goal_score_1,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_3_month_2_actual_ytd'] = array(
+  '#markup' => $delivery_on_time_month_2,
+  '#prefix' => '<td><div id="' .$status_metric_3_month_2. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_3_month_2_trend'] = array(
+  '#markup' => $trend_metric_3_month_2,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_3_month_3_goal'] = array(
+  '#markup' => $goal_score_1,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_3_month_3_actual_ytd'] = array(
+  '#markup' => $delivery_on_time_month_3,
+  '#prefix' => '<td><div id="' .$status_metric_3_month_3. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_3_month_3_trend'] = array(
+  '#markup' => $trend_metric_3_month_3,
+  '#prefix' => '<td>',
+  '#suffix' => '</td></tr>',
+  );
+
+  //Display Metric 4
+  $scorecard['metric_4_title'] = array(
+  '#markup' => $performance_metric_2,
+  '#prefix' => '<tr><td style="text-align:left">',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_4_benchmark'] = array(
+  '#markup' => $benchmark_score_2,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_4_fy_goal'] = array(
+  '#markup' => $goal_score_2,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_4_fy_actual_ytd'] = array(
+  '#markup' => $quality_coa_on_time,
+  '#prefix' => '<td><div id="' .$status_metric_4_fy. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_4_fy_trend'] = array(
+  '#markup' => $trend_metric_4_fy,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_4_month_1_goal'] = array(
+  '#markup' => $goal_score_2,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_4_month_1_actual_ytd'] = array(
+  '#markup' => $quality_coa_on_time_month_1,
+  '#prefix' => '<td><div id="' .$status_metric_4_month_1. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_4_month_1_trend'] = array(
+  '#markup' => $trend_metric_4_month_1,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_4_month_2_goal'] = array(
+  '#markup' => $goal_score_2,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_4_month_2_actual_ytd'] = array(
+  '#markup' => $quality_coa_on_time_month_2,
+  '#prefix' => '<td><div id="' .$status_metric_4_month_2. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_4_month_2_trend'] = array(
+  '#markup' => $trend_metric_4_month_2,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_4_month_3_goal'] = array(
+  '#markup' => $goal_score_2,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_4_month_3_actual_ytd'] = array(
+  '#markup' => $quality_coa_on_time_month_3,
+  '#prefix' => '<td><div id="' .$status_metric_4_month_3. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_4_month_3_trend'] = array(
+  '#markup' => $trend_metric_4_month_3,
+  '#prefix' => '<td>',
+  '#suffix' => '</td></tr>',
+  );
+
+  //Display Metric 5
+  $scorecard['metric_5_title'] = array(
+  '#markup' => $performance_metric_5,
+  '#prefix' => '<tr><td style="text-align:left">',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_5_benchmark'] = array(
+  '#markup' => $benchmark_score_5,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_5_fy_goal'] = array(
+  '#markup' => $goal_score_5,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_5_fy_actual_ytd'] = array(
+  '#markup' => $quality_scars_closure_rate,
+  '#prefix' => '<td><div id="' .$status_metric_5_fy. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_5_fy_trend'] = array(
+  '#markup' => $trend_metric_5_fy,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_5_month_1_goal'] = array(
+  '#markup' => $goal_score_5,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_5_month_1_actual_ytd'] = array(
+  '#markup' => $quality_scars_closure_rate_month_1,
+  '#prefix' => '<td><div id="' .$status_metric_5_month_1. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_5_month_1_trend'] = array(
+  '#markup' => $trend_metric_5_month_1,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_5_month_2_goal'] = array(
+  '#markup' => $goal_score_5,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_5_month_2_actual_ytd'] = array(
+  '#markup' => $quality_scars_closure_rate_month_2,
+  '#prefix' => '<td><div id="' .$status_metric_5_month_2. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_5_month_2_trend'] = array(
+  '#markup' => $trend_metric_5_month_2,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_5_month_3_goal'] = array(
+  '#markup' => $goal_score_5,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_5_month_3_actual_ytd'] = array(
+  '#markup' => $quality_scars_closure_rate_month_3,
+  '#prefix' => '<td><div id="' .$status_metric_5_month_3. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_5_month_3_trend'] = array(
+  '#markup' => $trend_metric_5_month_3,
+  '#prefix' => '<td>',
+  '#suffix' => '</td></tr>',
+  );
+
+  //Display Metric 6
+  $scorecard['metric_6_title'] = array(
+  '#markup' => $performance_metric_6,
+  '#prefix' => '<tr><td style="text-align:left">',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_6_benchmark'] = array(
+  '#markup' => $benchmark_score_6,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_6_fy_goal'] = array(
+  '#markup' => $goal_score_6,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_6_fy_actual_ytd'] = array(
+  '#markup' => $service_rating,
+  '#prefix' => '<td><div id="' .$status_metric_6_fy. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_6_fy_trend'] = array(
+  '#markup' => $trend_metric_6_fy,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_6_month_1_goal'] = array(
+  '#markup' => $goal_score_6,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_6_month_1_actual_ytd'] = array(
+  '#markup' => $service_rating_month_1,
+  '#prefix' => '<td><div id="' .$status_metric_6_month_1. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_6_month_1_trend'] = array(
+  '#markup' => $trend_metric_6_month_1,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_6_month_2_goal'] = array(
+  '#markup' => $goal_score_6,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_6_month_2_actual_ytd'] = array(
+  '#markup' => $service_rating_month_2,
+  '#prefix' => '<td><div id="' .$status_metric_6_month_2. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_6_month_2_trend'] = array(
+  '#markup' => $trend_metric_6_month_2,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_6_month_3_goal'] = array(
+  '#markup' => $goal_score_6,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_6_month_3_actual_ytd'] = array(
+  '#markup' => $service_rating_month_3,
+  '#prefix' => '<td><div id="' .$status_metric_6_month_3. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_6_month_3_trend'] = array(
+  '#markup' => $trend_metric_6_month_3,
+  '#prefix' => '<td>',
+  '#suffix' => '</td></tr>',
+  );
+
+  //Display Metric 7
+  $scorecard['metric_7_title'] = array(
+  '#markup' => $performance_metric_7,
+  '#prefix' => '<tr><td style="text-align:left">',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_7_benchmark'] = array(
+  '#markup' => $benchmark_score_7,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_7_fy_goal'] = array(
+  '#markup' => $goal_score_7,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_7_fy_actual_ytd'] = array(
+  '#markup' => $packing_slip_accuracy,
+  '#prefix' => '<td><div id="' .$status_metric_7_fy. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_7_fy_trend'] = array(
+  '#markup' => $trend_metric_7_fy,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_7_month_1_goal'] = array(
+  '#markup' => $goal_score_7,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_7_month_1_actual_ytd'] = array(
+  '#markup' => $packing_slip_accuracy_month_1,
+  '#prefix' => '<td><div id="' .$status_metric_7_month_1. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_7_month_1_trend'] = array(
+  '#markup' => $trend_metric_7_month_1,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_7_month_2_goal'] = array(
+  '#markup' => $goal_score_7,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_7_month_2_actual_ytd'] = array(
+  '#markup' => $packing_slip_accuracy_month_2,
+  '#prefix' => '<td><div id="' .$status_metric_7_month_2. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_7_month_2_trend'] = array(
+  '#markup' => $trend_metric_7_month_2,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_7_month_3_goal'] = array(
+  '#markup' => $goal_score_7,
+  '#prefix' => '<td>',
+  '#suffix' => '</td>',
+  );
+
+  $scorecard['metric_7_month_3_actual_ytd'] = array(
+  '#markup' => $packing_slip_accuracy_month_3,
+  '#prefix' => '<td><div id="' .$status_metric_7_month_3. '">',
+  '#suffix' => '</div></td>',
+  );
+
+  $scorecard['metric_7_month_3_trend'] = array(
+  '#markup' => $trend_metric_7_month_3,
+  '#prefix' => '<td>',
+  '#suffix' => '</td></tr></table>',
+  );
+
+  //DISPLAY SCORECARD SERVICE ASSESSMENT
+  //Only show if service GPA is not N/D
+  if ($service_gpa_score != "N/D"){
+      If(!empty($service_assessment_start))
+      {
+          $scorecard['worksheet_container_open'] = array(
+          '#markup' => '<div id="worksheet_heading_container"><span class="worksheet_heading no-print">Service Assessment: ' . date_display_mask($service_assessment_start) . ' - ' . date_display_mask($service_assessment_end) . '</span></div>',
+          );
+      }
+      else
+      {
+          $scorecard['worksheet_container_open'] = array(
+          '#markup' => '<div id="worksheet_heading_container"></div>',
+          );
+      }
+
+      //Supplier Contact Section
+      //Open table
+      $scorecard['open_table'] = array(
+          '#markup' => '<table id="worksheet_table">',
+      );
+
+      //Section 1
+      //hard coded now but in the future it can read the section from the table
+      $section_1 = "point_of_contact";
+      $section_1_name = "Point of Contact";
+
+      $scorecard['heading_section_' . $section_1] = array(
+          '#markup' => '<b>' . $section_1_name . '</b>',
+          '#prefix' => '<tr><th>',
+          '#suffix' => '</th>',
+      );
+
+      $scorecard['heading_measurement_' . $section_1] = array(
+          '#markup' => '<b>Measurement</b>',
+          '#prefix' => '<th>',
+          '#suffix' => '</th>',
+      );
+
+      $scorecard['heading_available_points_' . $section_1] = array(
+          '#markup' => '<b>Available</b>',
+          '#prefix' => '<th>',
+          '#suffix' => '</th>',
+      );
+
+      $scorecard['heading_supplier_points_' . $section_1] = array(
+          '#markup' => '<b>Points</b>',
+          '#prefix' => '<th>',
+          '#suffix' => '</th></tr>',
+      );
+
+      //hard coded now but in the future it can count the questions in a section and set this
+      $section_1_questions = 2;
+      for($i=1; $i <= $section_1_questions; $i++)
+      {
+
+      $scorecard['question_' . $i] = array(
+          '#markup' => ${'question_' . $i},
+          '#prefix' => '<tr><td>',
+          '#suffix' => '</td>',
+      );
+
+      $scorecard['measure_' . $i] = array(
+          '#markup' => ${'measure_' . $i},
+          '#prefix' => '<td>',
+          '#suffix' => '</td>',
+      );
+
+      $scorecard['max_score_' . $i] = array(
+          '#markup' => ${'max_score_' . $i},
+          '#prefix' => '<td>',
+          '#suffix' => '</td>',
+      );
+
+      $scorecard['score_' . $i] = array(
+          '#markup' => ${'score_' . $i},
+          '#prefix' => '<td>',
+          '#suffix' => '</td></tr>',
+      );
+
+      if (${'comments_' . $i} != ""){
+          $scorecard['comments_' . $i] = array(
+              '#markup' => ${'comments_' . $i},
+              '#prefix' => '<tr class="worksheet_comments"><td colspan="4"><strong>Comments: </strong>',
+              '#suffix' => '</td></tr>',
+          );
+      }
+      }
+
+      //Section 2
+      //hard coded now but in the future it can read the section from the table
+      $section_2 = "supplier_help_chain";
+      $section_2_name = "Supplier Help Chain";
+
+      $scorecard['heading_section_' . $section_2] = array(
+          '#markup' => '<b>' . $section_2_name . '</b>',
+          '#prefix' => '<tr><th>',
+          '#suffix' => '</th>',
+      );
+
+      $scorecard['heading_measurement_' . $section_2] = array(
+          '#markup' => '<b>Measurement</b>',
+          '#prefix' => '<th>',
+          '#suffix' => '</th>',
+      );
+
+      $scorecard['heading_available_points_' . $section_2] = array(
+          '#markup' => '<b>Available</b>',
+          '#prefix' => '<th>',
+          '#suffix' => '</th>',
+      );
+
+      $scorecard['heading_supplier_points_' . $section_2] = array(
+          '#markup' => '<b>Points</b>',
+          '#prefix' => '<th>',
+          '#suffix' => '</th></tr>',
+      );
+
+      //hard coded now but in the future it can count the questions in a section and set this
+      $section_2_questions = 5;
+      for($i=3; $i <= $section_2_questions; $i++)
+      {
+
+      $scorecard['question_' . $i] = array(
+          '#markup' => ${'question_' . $i},
+          '#prefix' => '<tr><td>',
+          '#suffix' => '</td>',
+      );
+
+      $scorecard['measure_' . $i] = array(
+          '#markup' => ${'measure_' . $i},
+          '#prefix' => '<td>',
+          '#suffix' => '</td>',
+      );
+
+      $scorecard['max_score_' . $i] = array(
+          '#markup' => ${'max_score_' . $i},
+          '#prefix' => '<td>',
+          '#suffix' => '</td>',
+      );
+
+      $scorecard['score_' . $i] = array(
+          '#markup' => ${'score_' . $i},
+          '#prefix' => '<td>',
+          '#suffix' => '</td></tr>',
+      );
+
+       if (${'comments_' . $i} != ""){
+          $scorecard['comments_' . $i] = array(
+              '#markup' => ${'comments_' . $i},
+              '#prefix' => '<tr class="worksheet_comments"><td colspan="4"><strong>Comments: </strong>',
+              '#suffix' => '</td></tr>',
+          );
+       }
+      }
+
+      //Section 3
+      //hard coded now but in the future it can read the section from the table
+      $section_3 = "supplier_flexibility";
+      $section_3_name = "Supplier Flexibility";
+
+      $scorecard['heading_section_' . $section_3] = array(
+          '#markup' => '<b>' . $section_3_name . '</b>',
+          '#prefix' => '<tr><th>',
+          '#suffix' => '</th>',
+      );
+
+     $scorecard['heading_measurement_' . $section_3] = array(
+          '#markup' => '<b>Measurement</b>',
+          '#prefix' => '<th>',
+          '#suffix' => '</th>',
+      );
+
+      $scorecard['heading_available_points_' . $section_3] = array(
+          '#markup' => '<b>Available</b>',
+          '#prefix' => '<th>',
+          '#suffix' => '</th>',
+      );
+
+      $scorecard['heading_supplier_points_' . $section_3] = array(
+          '#markup' => '<b>Points</b>',
+          '#prefix' => '<th>',
+          '#suffix' => '</th></tr>',
+      );
+
+      //hard coded now but in the future it can count the questions in a section and set this
+      $section_3_questions = 7;
+      for($i=6; $i <= $section_3_questions; $i++)
+      {
+
+      $scorecard['question_' . $i] = array(
+          '#markup' => ${'question_' . $i},
+          '#prefix' => '<tr><td>',
+          '#suffix' => '</td>',
+      );
+
+      $scorecard['measure_' . $i] = array(
+          '#markup' => ${'measure_' . $i},
+          '#prefix' => '<td>',
+          '#suffix' => '</td>',
+      );
+
+      $scorecard['max_score_' . $i] = array(
+          '#markup' => ${'max_score_' . $i},
+          '#prefix' => '<td>',
+          '#suffix' => '</td>',
+      );
+
+      $scorecard['score_' . $i] = array(
+          '#markup' => ${'score_' . $i},
+          '#prefix' => '<td>',
+          '#suffix' => '</td></tr>',
+      );
+
+      if (${'comments_' . $i} != ""){
+          $scorecard['comments_' . $i] = array(
+              '#markup' => ${'comments_' . $i},
+              '#prefix' => '<tr class="worksheet_comments"><td colspan="4"><strong>Comments: </strong>',
+              '#suffix' => '</td></tr>',
+          );
+      }
+      }
+
+      //Totals
+
+      $scorecard['total_title'] = array(
+      '#markup' => '<b>Customer Service Total:</b>',
+      '#prefix' => '<tr><td colspan ="2"><span class="service_title_score">',
+      '#suffix' => '</span></td>',
+      );
+
+      $scorecard['total_max_points'] = array(
+      '#markup' => '<b>'.$total_max_score.'</b>',
+      '#prefix' => '<td><span class="service_max_score">',
+      '#suffix' => '</span></td>',
+      );
+
+      $scorecard['total_points'] = array(
+      '#markup' => '<b>'.$total_score.'</b>',
+      '#prefix' => '<td><span class="service_supplier_score">',
+      '#suffix' => '</span></td>',
+      );
+
+      //Close Table
+      $scorecard['close_table'] = array(
+          '#markup' => '</table>',
+      );
+  }//end of displaying service questionnaire if service is not N/D
+
+  $form['display_scorecard'] = array(
+         '#markup' => render($scorecard),
+         '#prefix' => '<div id="display_scorecard">',
+         '#suffix' => '</div>',
+   );
+
+  //********SUBMIT AND RETURN BUTTONS*******
+
+  //Only show the save and assessment buttons if its a new scorecard which requires a change for the go back css
+  //so that needs to be different too
+  if($existing_scorecard == "yes")
+  {
+    $form['print_existing_scorecard_start'] = array(
+     '#markup' => '<div class="hide_when_printed"><div class="general_bottom_divider"></div><div class="scorecard_action_icons"><div class="scorecard_action_icons_row">'
+    );
+
+    $form['print_existing_scorecard'] = array(
+     '#markup' => '<a href="/print/company_x_forms/form_scorecard/' . $scorecard_id . '" target="_blank"><img src="/images/print_32x32.png"></a>',
+     '#prefix' => '<div class="scorecard_action_icons_print"><span class="beautytips grow" title="Print the Scorecard">',
+     '#suffix' => '</span></div>',
+    );
+
+    //return it to where the scorecard generation came from or default to scorecard list
+    if ($source == 'due_report') // go to scorecards due
+    {
+        $form['back_to_scorecards_due'] = array(
+         '#prefix' => '<div class="scorecard_action_icons_back"><span class="beautytips grow" title="Return to the Scorecards Due Report">',
+         '#markup' => '<a href="/scorecards_due_report/' . $filter_due_category . '/' . $filter_mill . '">' . '<img src="/images/go_back_6.png"></a>',
+         '#suffix' => '</span></div>',
+        );
+    }
+    else //default to scorecard list
+    {
+        $form['back_to_scorecard_list'] = array(
+         '#prefix' => '<div class="scorecard_action_icons_back"><span class="beautytips grow" title="Return to the Scorecards List">',
+         '#markup' => '<a href="/scorecard_list/' . $filter_mill . '/' . $filter_supplier . '/' . $filter_year . '"><img src="/images/go_back_6.png"></a>',
+         '#suffix' => '</span></div>',
+        );
+
+    }//end check for source
+
+    $form['print_existing_scorecard_end'] = array(
+     '#markup' => '</div></div></div>'
+    );
+
+  }
+    else
+    //if its new
+    {
+    $form['print_new_scorecard_start'] = array(
+     '#markup' => '<div class="hide_when_printed"><div class="general_bottom_divider"></div><div class="scorecard_action_icons"><div class="scorecard_action_icons_row">'
+    );
+
+    $form['print_new_scorecard'] = array(
+     '#markup' => '<a href="/print/company_x_forms/form_scorecard/0/' . $supplier_selected . '/' . $supplier_year_selected . '" target="_blank"><img src="/images/print_32x32.png"></a>',
+     '#prefix' => '<div id="print_new_scorecard" class="scorecard_action_icons_print"><span class="beautytips grow" title="Print the Scorecard">',
+     '#suffix' => '</span></div>',
+    );
+
+//    //Only show the create assessment if a supplier is selected
+//    if ($supplier_selected != "")
+//    {
+        $form['generate_assessment'] = array(
+         '#markup' => '<a href="/company_x_forms/form_service_data_entry/0/0/' . $supplier_selected . '/' . $supplier_year_selected . '/' . $filter_due_category . '/' . $filter_mill . '/' . $filter_supplier . '/' . $filter_year . '"><img src="/images/service_assessment.png"></a>',
+         '#prefix' => '<div id="generate_assessment" class="scorecard_action_icons_assessment"><span class="beautytips grow" title="Create a new service assessment for this supplier">',
+         '#suffix' => '</span></div>',
+        );
+//    }
+
+    $form['submit_button'] = array(
+     '#type' => 'image_button',
+     '#src' => '/images/save3.png',
+     '#prefix' => '<div class="scorecard_action_icons_save"><span class="beautytips grow" title="Save the Scorecard">',
+     '#suffix' => '</span></div>',
+    );
+
+      //return it to where the scorecard generation came from or default to scorecard list
+    if ($source == 'due_report') // go to scorecards due
+    {
+        $form['back_to_scorecards_due'] = array(
+         '#prefix' => '<div class="scorecard_action_icons_back"><span class="beautytips grow" title="Return to the Scorecards Due Report">',
+         '#markup' => '<a href="/scorecards_due_report/' . $filter_due_category . '/' . $filter_mill .'"><img src="/images/go_back_6.png"></a>',
+         '#suffix' => '</span></div>',
+        );
+    }
+    else //default to scorecard list
+    {
+        $form['back_to_scorecard_list'] = array(
+         '#prefix' => '<div class="scorecard_action_icons_back"><span class="beautytips grow" title="Return to the Scorecards List">',
+         '#markup' => '<a href="/scorecard_list/' . $filter_mill . '/' . $filter_supplier . '/' . $filter_year . '"><img src="/images/go_back_6.png"></a>',
+         '#suffix' => '</span></div>',
+        );
+    }//end check for source
+
+    $form['print_new_scorecard_end'] = array(
+     '#markup' => '</div></div></div>'
+    );
+
+    }//end new scorecard check to display the correct submit buttons
+
+
+    //********CAPTURE THE SCORECARD DATA********
+
+    //Get the user info so we can record who created it
+    global $user;
+    $account_id = ($user->uid);
+
+    //Get user first name
+    $first_name_query = db_select('field_data_field_first_name', 'fn')
+      ->condition('fn.entity_id', $account_id, '=' )
+      ->fields('fn', array('field_first_name_value'));
+
+    //Execute query
+    $first_name_result = array();
+    $first_name_result = $first_name_query->execute()->fetchField();
+
+    //Get user last name
+    $last_name_query = db_select('field_data_field_last_name', 'ln')
+      ->condition('ln.entity_id', $account_id )
+      ->fields('ln', array('field_last_name_value'));
+
+    //Execute query
+    $last_name_result = array();
+    $last_name_result = $last_name_query->execute()->fetchField();
+
+    $created_by = $first_name_result . ' ' . $last_name_result;
+
+    //Put all of the variables in storage so we can get them out of storage later when there is more room for everything
+    $form_state['storage']['due_category_passed_in'] = $filter_due_category;
+    $form_state['storage']['filter_mill'] = $filter_mill;
+    $form_state['storage']['filter_supplier'] = $filter_supplier;
+    $form_state['storage']['filter_year'] = $filter_year;
+
+    $form_state['storage']['created_by'] = $created_by;
+    $form_state['storage']['source'] = $source;
+    $form_state['storage']['mill'] = $related_mill;
+    $form_state['storage']['supplier_number'] = $supplier_selected;
+    $form_state['storage']['supplier_name'] = $display_name;
+    $form_state['storage']['supplier_year'] = $supplier_year_selected;
+    $form_state['storage']['is_this_a_relationship'] = $is_this_a_relationship;
+    $form_state['storage']['approved_status_answer'] = $approved_status_answer;
+    $form_state['storage']['provisional_status_answer'] = $provisional_status_answer;
+    $form_state['storage']['scorecard_start_date'] = $scorecard_start_date;
+    $form_state['storage']['scorecard_end_date'] = $scorecard_end_date;
+
+    $form_state['storage']['quality_gpa_score'] = $quality_gpa_score;
+    $form_state['storage']['quality_gpa_color'] = $quality_gpa_color;
+    $form_state['storage']['quality_total_number_pos'] = $quality_total_number_pos;
+    $form_state['storage']['quality_total_approved_pos'] = $quality_total_approved_pos;
+    $form_state['storage']['quality_sum_scars'] = $quality_sum_scars;
+    $form_state['storage']['quality_sum_scars_closed'] = $quality_sum_scars_closed;
+
+    $form_state['storage']['delivery_gpa_score'] = $delivery_gpa_score;
+    $form_state['storage']['delivery_gpa_color'] = $delivery_gpa_color;
+    $form_state['storage']['delivery_total_number_pos'] = $delivery_total_number_pos;
+
+    $form_state['storage']['service_gpa_score'] = $service_gpa_score;
+    $form_state['storage']['service_gpa_color'] = $service_gpa_color;
+    $form_state['storage']['service_total_score'] = $total_score;
+    $form_state['storage']['service_total_max_score'] = $total_max_score;
+    $form_state['storage']['packing_slip_discrepancies_total'] = $packing_slip_discrepancies_total;
+
+    $form_state['storage']['previous_month_1_text'] = $previous_month_1_text;
+    $form_state['storage']['previous_month_2_text'] = $previous_month_2_text;
+    $form_state['storage']['previous_month_3_text'] = $previous_month_3_text;
+    $form_state['storage']['previous_month_0_text'] = $previous_month_0_text;
+
+    $form_state['storage']['performance_metric_1'] = $performance_metric_1;
+    $form_state['storage']['performance_metric_2'] = $performance_metric_2;
+    $form_state['storage']['performance_metric_3'] = $performance_metric_3;
+    $form_state['storage']['performance_metric_4'] = $performance_metric_4;
+    $form_state['storage']['performance_metric_5'] = $performance_metric_5;
+    $form_state['storage']['performance_metric_6'] = $performance_metric_6;
+    $form_state['storage']['performance_metric_7'] = $performance_metric_7;
+
+    $form_state['storage']['benchmark_score_1'] = $benchmark_score_1;
+    $form_state['storage']['benchmark_score_2'] = $benchmark_score_2;
+    $form_state['storage']['benchmark_score_3'] = $benchmark_score_3;
+    $form_state['storage']['benchmark_score_4'] = $benchmark_score_4;
+    $form_state['storage']['benchmark_score_5'] = $benchmark_score_5;
+    $form_state['storage']['benchmark_score_6'] = $benchmark_score_6;
+    $form_state['storage']['benchmark_score_7'] = $benchmark_score_7;
+
+    $form_state['storage']['goal_score_1'] = $goal_score_1;
+    $form_state['storage']['goal_score_2'] = $goal_score_2;
+    $form_state['storage']['goal_score_3'] = $goal_score_3;
+    $form_state['storage']['goal_score_4'] = $goal_score_4;
+    $form_state['storage']['goal_score_5'] = $goal_score_5;
+    $form_state['storage']['goal_score_6'] = $goal_score_6;
+    $form_state['storage']['goal_score_7'] = $goal_score_7;
+
+    $form_state['storage']['status_metric_1_fy'] = $status_metric_1_fy;
+    $form_state['storage']['status_metric_1_month_1'] = $status_metric_1_month_1;
+    $form_state['storage']['status_metric_1_month_2'] = $status_metric_1_month_2;
+    $form_state['storage']['status_metric_1_month_3'] = $status_metric_1_month_3;
+
+    $form_state['storage']['status_metric_2_fy'] = $status_metric_2_fy;
+    $form_state['storage']['status_metric_2_month_1'] = $status_metric_2_month_1;
+    $form_state['storage']['status_metric_2_month_2'] = $status_metric_2_month_2;
+    $form_state['storage']['status_metric_2_month_3'] = $status_metric_2_month_3;
+
+    $form_state['storage']['status_metric_3_fy'] = $status_metric_3_fy;
+    $form_state['storage']['status_metric_3_month_1'] = $status_metric_3_month_1;
+    $form_state['storage']['status_metric_3_month_2'] = $status_metric_3_month_2;
+    $form_state['storage']['status_metric_3_month_3'] = $status_metric_3_month_3;
+
+    $form_state['storage']['status_metric_4_fy'] = $status_metric_4_fy;
+    $form_state['storage']['status_metric_4_month_1'] = $status_metric_4_month_1;
+    $form_state['storage']['status_metric_4_month_2'] = $status_metric_4_month_2;
+    $form_state['storage']['status_metric_4_month_3'] = $status_metric_4_month_3;
+
+    $form_state['storage']['status_metric_5_fy'] = $status_metric_5_fy;
+    $form_state['storage']['status_metric_5_month_1'] = $status_metric_5_month_1;
+    $form_state['storage']['status_metric_5_month_2'] = $status_metric_5_month_2;
+    $form_state['storage']['status_metric_5_month_3'] = $status_metric_5_month_3;
+
+    $form_state['storage']['status_metric_6_fy'] = $status_metric_6_fy;
+    $form_state['storage']['status_metric_6_month_1'] = $status_metric_6_month_1;
+    $form_state['storage']['status_metric_6_month_2'] = $status_metric_6_month_2;
+    $form_state['storage']['status_metric_6_month_3'] = $status_metric_6_month_3;
+
+    $form_state['storage']['status_metric_7_fy'] = $status_metric_7_fy;
+    $form_state['storage']['status_metric_7_month_1'] = $status_metric_7_month_1;
+    $form_state['storage']['status_metric_7_month_2'] = $status_metric_7_month_2;
+    $form_state['storage']['status_metric_7_month_3'] = $status_metric_7_month_3;
+
+    $form_state['storage']['trend_metric_1_fy'] = $trend_metric_1_fy;
+    $form_state['storage']['trend_metric_1_month_1'] = $trend_metric_1_month_1;
+    $form_state['storage']['trend_metric_1_month_2'] = $trend_metric_1_month_2;
+    $form_state['storage']['trend_metric_1_month_3'] = $trend_metric_1_month_3;
+
+    $form_state['storage']['trend_metric_2_fy'] = $trend_metric_2_fy;
+    $form_state['storage']['trend_metric_2_month_1'] = $trend_metric_2_month_1;
+    $form_state['storage']['trend_metric_2_month_2'] = $trend_metric_2_month_2;
+    $form_state['storage']['trend_metric_2_month_3'] = $trend_metric_2_month_3;
+
+    $form_state['storage']['trend_metric_3_fy'] = $trend_metric_3_fy;
+    $form_state['storage']['trend_metric_3_month_1'] = $trend_metric_3_month_1;
+    $form_state['storage']['trend_metric_3_month_2'] = $trend_metric_3_month_2;
+    $form_state['storage']['trend_metric_3_month_3'] = $trend_metric_3_month_3;
+
+    $form_state['storage']['trend_metric_4_fy'] = $trend_metric_4_fy;
+    $form_state['storage']['trend_metric_4_month_1'] = $trend_metric_4_month_1;
+    $form_state['storage']['trend_metric_4_month_2'] = $trend_metric_4_month_2;
+    $form_state['storage']['trend_metric_4_month_3'] = $trend_metric_4_month_3;
+
+    $form_state['storage']['trend_metric_5_fy'] = $trend_metric_5_fy;
+    $form_state['storage']['trend_metric_5_month_1'] = $trend_metric_5_month_1;
+    $form_state['storage']['trend_metric_5_month_2'] = $trend_metric_5_month_2;
+    $form_state['storage']['trend_metric_5_month_3'] = $trend_metric_5_month_3;
+
+    $form_state['storage']['trend_metric_6_fy'] = $trend_metric_6_fy;
+    $form_state['storage']['trend_metric_6_month_1'] = $trend_metric_6_month_1;
+    $form_state['storage']['trend_metric_6_month_2'] = $trend_metric_6_month_2;
+    $form_state['storage']['trend_metric_6_month_3'] = $trend_metric_6_month_3;
+
+    $form_state['storage']['trend_metric_7_fy'] = $trend_metric_7_fy;
+    $form_state['storage']['trend_metric_7_month_1'] = $trend_metric_7_month_1;
+    $form_state['storage']['trend_metric_7_month_2'] = $trend_metric_7_month_2;
+    $form_state['storage']['trend_metric_7_month_3'] = $trend_metric_7_month_3;
+
+    $form_state['storage']['quality_coa_in_specification'] = $quality_coa_in_specification;
+    $form_state['storage']['quality_coa_in_specification_month_1'] = $quality_coa_in_specification_month_1;
+    $form_state['storage']['quality_coa_in_specification_month_2'] = $quality_coa_in_specification_month_2;
+    $form_state['storage']['quality_coa_in_specification_month_3'] = $quality_coa_in_specification_month_3;
+
+    $form_state['storage']['quality_scars_issued_per_month'] = $quality_scars_issued_per_month;
+    $form_state['storage']['quality_sum_scars_month_1'] = $quality_sum_scars_month_1;
+    $form_state['storage']['quality_sum_scars_month_2'] = $quality_sum_scars_month_2;
+    $form_state['storage']['quality_sum_scars_month_3'] = $quality_sum_scars_month_3;
+
+    $form_state['storage']['delivery_on_time'] = $delivery_on_time;
+    $form_state['storage']['delivery_on_time_month_1'] = $delivery_on_time_month_1;
+    $form_state['storage']['delivery_on_time_month_2'] = $delivery_on_time_month_2;
+    $form_state['storage']['delivery_on_time_month_3'] = $delivery_on_time_month_3;
+
+    $form_state['storage']['quality_coa_on_time'] = $quality_coa_on_time;
+    $form_state['storage']['quality_coa_on_time_month_1'] = $quality_coa_on_time_month_1;
+    $form_state['storage']['quality_coa_on_time_month_2'] = $quality_coa_on_time_month_2;
+    $form_state['storage']['quality_coa_on_time_month_3'] = $quality_coa_on_time_month_3;
+
+    $form_state['storage']['quality_scars_closure_rate'] = $quality_scars_closure_rate;
+    $form_state['storage']['quality_scars_closure_rate_month_1'] = $quality_scars_closure_rate_month_1;
+    $form_state['storage']['quality_scars_closure_rate_month_2'] = $quality_scars_closure_rate_month_2;
+    $form_state['storage']['quality_scars_closure_rate_month_3'] = $quality_scars_closure_rate_month_3;
+
+    $form_state['storage']['service_rating'] = $service_rating;
+    $form_state['storage']['service_assessment_start'] = $service_assessment_start;
+    $form_state['storage']['service_assessment_end'] = $service_assessment_end;
+
+    $form_state['storage']['service_rating_month_1'] = $service_rating_month_1;
+    $form_state['storage']['service_rating_month_2'] = $service_rating_month_2;
+    $form_state['storage']['service_rating_month_3'] = $service_rating_month_3;
+
+    $form_state['storage']['packing_slip_accuracy'] = $packing_slip_accuracy;
+    $form_state['storage']['packing_slip_accuracy_month_1'] = $packing_slip_accuracy_month_1;
+    $form_state['storage']['packing_slip_accuracy_month_2'] = $packing_slip_accuracy_month_2;
+    $form_state['storage']['packing_slip_accuracy_month_3'] = $packing_slip_accuracy_month_3;
+
+    $form_state['storage']['question_1'] = $question_1;
+    $form_state['storage']['question_2'] = $question_2;
+    $form_state['storage']['question_3'] = $question_3;
+    $form_state['storage']['question_4'] = $question_4;
+    $form_state['storage']['question_5'] = $question_5;
+    $form_state['storage']['question_6'] = $question_6;
+    $form_state['storage']['question_7'] = $question_7;
+    $form_state['storage']['question_8'] = $question_8;
+
+    $form_state['storage']['measure_1'] = $measure_1;
+    $form_state['storage']['measure_2'] = $measure_2;
+    $form_state['storage']['measure_3'] = $measure_3;
+    $form_state['storage']['measure_4'] = $measure_4;
+    $form_state['storage']['measure_5'] = $measure_5;
+    $form_state['storage']['measure_6'] = $measure_6;
+    $form_state['storage']['measure_7'] = $measure_7;
+    $form_state['storage']['measure_8'] = $measure_8;
+
+    $form_state['storage']['score_1'] = $score_1;
+    $form_state['storage']['score_2'] = $score_2;
+    $form_state['storage']['score_3'] = $score_3;
+    $form_state['storage']['score_4'] = $score_4;
+    $form_state['storage']['score_5'] = $score_5;
+    $form_state['storage']['score_6'] = $score_6;
+    $form_state['storage']['score_7'] = $score_7;
+    $form_state['storage']['score_8'] = $score_8;
+
+    $form_state['storage']['max_score_1'] = $max_score_1;
+    $form_state['storage']['max_score_2'] = $max_score_2;
+    $form_state['storage']['max_score_3'] = $max_score_3;
+    $form_state['storage']['max_score_4'] = $max_score_4;
+    $form_state['storage']['max_score_5'] = $max_score_5;
+    $form_state['storage']['max_score_6'] = $max_score_6;
+    $form_state['storage']['max_score_7'] = $max_score_7;
+    $form_state['storage']['max_score_8'] = $max_score_8;
+
+    $form_state['storage']['comments_1'] = $comments_1;
+    $form_state['storage']['comments_2'] = $comments_2;
+    $form_state['storage']['comments_3'] = $comments_3;
+    $form_state['storage']['comments_4'] = $comments_4;
+    $form_state['storage']['comments_5'] = $comments_5;
+    $form_state['storage']['comments_6'] = $comments_6;
+    $form_state['storage']['comments_7'] = $comments_7;
+    $form_state['storage']['comments_8'] = $comments_8;
+
+    //Flag when the form has been run one time so we can do all sorts of cool things
+    $form_state['run_once'] = "Yes";
+
+    return $form;
+}
+
+//Scorecard AJAX - Changes made when the filters are changed
+function ajax_scorecard_callback($form, $form_state)
+{
+   //since we want to return multiple elements in multiple areas this array works just dandy
+   return array(
+     '#type' => 'ajax',
+     '#commands' => array(
+
+          ajax_command_replace("#display_scorecard", render($form['display_scorecard'])),
+          ajax_command_replace("#supplier", render($form['supplier'])),
+          ajax_command_replace("#supplier_year", render($form['supplier_year'])),
+          ajax_command_replace("#print_new_scorecard", render($form['print_new_scorecard'])),
+          ajax_command_replace("#generate_assessment", render($form['generate_assessment'])),
+      )
+   );
+}
+
+//function back_to_scorecard_list(){
+//    drupal_goto('scorecard_list');
+//}
+
+//function print_new_scorecard($form, &$form_state){
+//    $supplier_selected = $form_state['storage']['supplier_number'];
+//    $supplier_year_selected = $form_state['storage']['supplier_year'];
+//    drupal_goto('print/company_x_forms/form_scorecard/0/' . $supplier_selected . '/' . $supplier_year_selected);
+//}
+
+function form_scorecard_form_submit($form, &$form_state) {
+
+    //Get the values from storage and write them to the database
+    $id = db_insert('company_x_scorecards')
+        ->fields(array(
+
+        //Record the following fields
+        //Heading information
+        'mill' => $form_state['storage']['mill'],
+        'supplier_number' => $form_state['storage']['supplier_number'],
+        'supplier_name' => $form_state['storage']['supplier_name'],
+        'supplier_year' => $form_state['storage']['supplier_year'],
+        'is_this_a_relationship' => $form_state['storage']['is_this_a_relationship'],
+        'approved_status_answer' => $form_state['storage']['approved_status_answer'],
+        'provisional_status_answer' => $form_state['storage']['provisional_status_answer'],
+        'scorecard_start_date' => $form_state['storage']['scorecard_start_date'],
+        'scorecard_end_date' => $form_state['storage']['scorecard_end_date'],
+        //GPA Circles
+        'quality_gpa_score' => $form_state['storage']['quality_gpa_score'],
+        'quality_gpa_color' => $form_state['storage']['quality_gpa_color'],
+        'quality_total_number_pos' => $form_state['storage']['quality_total_number_pos'],
+        'quality_total_approved_pos' => $form_state['storage']['quality_total_approved_pos'],
+        'quality_sum_scars' => $form_state['storage']['quality_sum_scars'],
+        'quality_sum_scars_closed' => $form_state['storage']['quality_sum_scars_closed'],
+        'delivery_gpa_score' => $form_state['storage']['delivery_gpa_score'],
+        'delivery_gpa_color' => $form_state['storage']['delivery_gpa_color'],
+        'delivery_total_number_pos' => $form_state['storage']['delivery_total_number_pos'],
+        'service_gpa_score' => $form_state['storage']['service_gpa_score'],
+        'service_gpa_color' => $form_state['storage']['service_gpa_color'],
+        'service_total_score' => $form_state['storage']['service_total_score'],
+        'service_total_max_score' => $form_state['storage']['service_total_max_score'],
+        'packing_slip_discrepancies_total' => $form_state['storage']['packing_slip_discrepancies_total'],
+        //Performance Metrics
+        'previous_month_1_text' => $form_state['storage']['previous_month_1_text'],
+        'previous_month_2_text' => $form_state['storage']['previous_month_2_text'],
+        'previous_month_3_text' => $form_state['storage']['previous_month_3_text'],
+        'previous_month_0_text' => $form_state['storage']['previous_month_0_text'],
+        //Performance titles
+        'performance_metric_1' => $form_state['storage']['performance_metric_1'],
+        'performance_metric_2' => $form_state['storage']['performance_metric_2'],
+        'performance_metric_3' => $form_state['storage']['performance_metric_3'],
+        'performance_metric_4' => $form_state['storage']['performance_metric_4'],
+        'performance_metric_5' => $form_state['storage']['performance_metric_5'],
+        'performance_metric_6' => $form_state['storage']['performance_metric_6'],
+        'performance_metric_7' => $form_state['storage']['performance_metric_7'],
+        //Benchmarks
+        'benchmark_score_1' => $form_state['storage']['benchmark_score_1'],
+        'benchmark_score_2' => $form_state['storage']['benchmark_score_2'],
+        'benchmark_score_3' => $form_state['storage']['benchmark_score_3'],
+        'benchmark_score_4' => $form_state['storage']['benchmark_score_4'],
+        'benchmark_score_5' => $form_state['storage']['benchmark_score_5'],
+        'benchmark_score_6' => $form_state['storage']['benchmark_score_6'],
+        'benchmark_score_7' => $form_state['storage']['benchmark_score_7'],
+        //Goals
+        'goal_score_1' => $form_state['storage']['goal_score_1'],
+        'goal_score_2' => $form_state['storage']['goal_score_2'],
+        'goal_score_3' => $form_state['storage']['goal_score_3'],
+        'goal_score_4' => $form_state['storage']['goal_score_4'],
+        'goal_score_5' => $form_state['storage']['goal_score_5'],
+        'goal_score_6' => $form_state['storage']['goal_score_6'],
+        'goal_score_7' => $form_state['storage']['goal_score_7'],
+        //Status background colors
+        'status_metric_1_fy' => $form_state['storage']['status_metric_1_fy'],
+        'status_metric_1_month_1' => $form_state['storage']['status_metric_1_month_1'],
+        'status_metric_1_month_2' => $form_state['storage']['status_metric_1_month_2'],
+        'status_metric_1_month_3' => $form_state['storage']['status_metric_1_month_3'],
+        'status_metric_2_fy' => $form_state['storage']['status_metric_2_fy'],
+        'status_metric_2_month_1' => $form_state['storage']['status_metric_2_month_1'],
+        'status_metric_2_month_2' => $form_state['storage']['status_metric_2_month_2'],
+        'status_metric_2_month_3' => $form_state['storage']['status_metric_2_month_3'],
+        'status_metric_3_fy' => $form_state['storage']['status_metric_3_fy'],
+        'status_metric_3_month_1' => $form_state['storage']['status_metric_3_month_1'],
+        'status_metric_3_month_2' => $form_state['storage']['status_metric_3_month_2'],
+        'status_metric_3_month_3' => $form_state['storage']['status_metric_3_month_3'],
+        'status_metric_4_fy' => $form_state['storage']['status_metric_4_fy'],
+        'status_metric_4_month_1' => $form_state['storage']['status_metric_4_month_1'],
+        'status_metric_4_month_2' => $form_state['storage']['status_metric_4_month_2'],
+        'status_metric_4_month_3' => $form_state['storage']['status_metric_4_month_3'],
+        'status_metric_5_fy' => $form_state['storage']['status_metric_5_fy'],
+        'status_metric_5_month_1' => $form_state['storage']['status_metric_5_month_1'],
+        'status_metric_5_month_2' => $form_state['storage']['status_metric_5_month_2'],
+        'status_metric_5_month_3' => $form_state['storage']['status_metric_5_month_3'],
+        'status_metric_6_fy' => $form_state['storage']['status_metric_6_fy'],
+        'status_metric_6_month_1' => $form_state['storage']['status_metric_6_month_1'],
+        'status_metric_6_month_2' => $form_state['storage']['status_metric_6_month_2'],
+        'status_metric_6_month_3' => $form_state['storage']['status_metric_6_month_3'],
+        'status_metric_7_fy' => $form_state['storage']['status_metric_7_fy'],
+        'status_metric_7_month_1' => $form_state['storage']['status_metric_7_month_1'],
+        'status_metric_7_month_2' => $form_state['storage']['status_metric_7_month_2'],
+        'status_metric_7_month_3' => $form_state['storage']['status_metric_7_month_3'],
+        //Trends
+        'trend_metric_1_fy' => $form_state['storage']['trend_metric_1_fy'],
+        'trend_metric_1_month_1' => $form_state['storage']['trend_metric_1_month_1'],
+        'trend_metric_1_month_2' => $form_state['storage']['trend_metric_1_month_2'],
+        'trend_metric_1_month_3' => $form_state['storage']['trend_metric_1_month_3'],
+        'trend_metric_2_fy' => $form_state['storage']['trend_metric_2_fy'],
+        'trend_metric_2_month_1' => $form_state['storage']['trend_metric_2_month_1'],
+        'trend_metric_2_month_2' => $form_state['storage']['trend_metric_2_month_2'],
+        'trend_metric_2_month_3' => $form_state['storage']['trend_metric_2_month_3'],
+        'trend_metric_3_fy' => $form_state['storage']['trend_metric_3_fy'],
+        'trend_metric_3_month_1' => $form_state['storage']['trend_metric_3_month_1'],
+        'trend_metric_3_month_2' => $form_state['storage']['trend_metric_3_month_2'],
+        'trend_metric_3_month_3' => $form_state['storage']['trend_metric_3_month_3'],
+        'trend_metric_4_fy' => $form_state['storage']['trend_metric_4_fy'],
+        'trend_metric_4_month_1' => $form_state['storage']['trend_metric_4_month_1'],
+        'trend_metric_4_month_2' => $form_state['storage']['trend_metric_4_month_2'],
+        'trend_metric_4_month_3' => $form_state['storage']['trend_metric_4_month_3'],
+        'trend_metric_5_fy' => $form_state['storage']['trend_metric_5_fy'],
+        'trend_metric_5_month_1' => $form_state['storage']['trend_metric_5_month_1'],
+        'trend_metric_5_month_2' => $form_state['storage']['trend_metric_5_month_2'],
+        'trend_metric_5_month_3' => $form_state['storage']['trend_metric_5_month_3'],
+        'trend_metric_6_fy' => $form_state['storage']['trend_metric_6_fy'],
+        'trend_metric_6_month_1' => $form_state['storage']['trend_metric_6_month_1'],
+        'trend_metric_6_month_2' => $form_state['storage']['trend_metric_6_month_2'],
+        'trend_metric_6_month_3' => $form_state['storage']['trend_metric_6_month_3'],
+        'trend_metric_7_fy' => $form_state['storage']['trend_metric_7_fy'],
+        'trend_metric_7_month_1' => $form_state['storage']['trend_metric_7_month_1'],
+        'trend_metric_7_month_2' => $form_state['storage']['trend_metric_7_month_2'],
+        'trend_metric_7_month_3' => $form_state['storage']['trend_metric_7_month_3'],
+        //Performance metric scores
+        'quality_coa_in_specification' => $form_state['storage']['quality_coa_in_specification'],
+        'quality_coa_in_specification_month_1' => $form_state['storage']['quality_coa_in_specification_month_1'],
+        'quality_coa_in_specification_month_2' => $form_state['storage']['quality_coa_in_specification_month_2'],
+        'quality_coa_in_specification_month_3' => $form_state['storage']['quality_coa_in_specification_month_3'],
+        'quality_scars_issued_per_month' => $form_state['storage']['quality_scars_issued_per_month'],
+        'quality_sum_scars_month_1' => $form_state['storage']['quality_sum_scars_month_1'],
+        'quality_sum_scars_month_2' => $form_state['storage']['quality_sum_scars_month_2'],
+        'quality_sum_scars_month_3' => $form_state['storage']['quality_sum_scars_month_3'],
+        'delivery_on_time' => $form_state['storage']['delivery_on_time'],
+        'delivery_on_time_month_1' => $form_state['storage']['delivery_on_time_month_1'],
+        'delivery_on_time_month_2' => $form_state['storage']['delivery_on_time_month_2'],
+        'delivery_on_time_month_3' => $form_state['storage']['delivery_on_time_month_3'],
+        'quality_coa_on_time' => $form_state['storage']['quality_coa_on_time'],
+        'quality_coa_on_time_month_1' => $form_state['storage']['quality_coa_on_time_month_1'],
+        'quality_coa_on_time_month_2' => $form_state['storage']['quality_coa_on_time_month_2'],
+        'quality_coa_on_time_month_3' => $form_state['storage']['quality_coa_on_time_month_3'],
+        'quality_scars_closure_rate' => $form_state['storage']['quality_scars_closure_rate'],
+        'quality_scars_closure_rate_month_1' => $form_state['storage']['quality_scars_closure_rate_month_1'],
+        'quality_scars_closure_rate_month_2' => $form_state['storage']['quality_scars_closure_rate_month_2'],
+        'quality_scars_closure_rate_month_3' => $form_state['storage']['quality_scars_closure_rate_month_3'],
+        'service_rating' => $form_state['storage']['service_rating'],
+        'service_rating_month_1' => $form_state['storage']['service_rating_month_1'],
+        'service_rating_month_2' => $form_state['storage']['service_rating_month_2'],
+        'service_rating_month_3' => $form_state['storage']['service_rating_month_3'],
+        'packing_slip_accuracy' => $form_state['storage']['packing_slip_accuracy'],
+        'packing_slip_accuracy_month_1' => $form_state['storage']['packing_slip_accuracy_month_1'],
+        'packing_slip_accuracy_month_2' => $form_state['storage']['packing_slip_accuracy_month_2'],
+        'packing_slip_accuracy_month_3' => $form_state['storage']['packing_slip_accuracy_month_3'],
+        //Service Assessment data
+        'service_assessment_start' => $form_state['storage']['service_assessment_start'],
+        'service_assessment_end' => $form_state['storage']['service_assessment_end'],
+        //Questions
+        'question_1' => $form_state['storage']['question_1'],
+        'question_2' => $form_state['storage']['question_2'],
+        'question_3' => $form_state['storage']['question_3'],
+        'question_4' => $form_state['storage']['question_4'],
+        'question_5' => $form_state['storage']['question_5'],
+        'question_6' => $form_state['storage']['question_6'],
+        'question_7' => $form_state['storage']['question_7'],
+        'question_8' => $form_state['storage']['question_8'],
+        //Measures
+        'measure_1' => $form_state['storage']['measure_1'],
+        'measure_2' => $form_state['storage']['measure_2'],
+        'measure_3' => $form_state['storage']['measure_3'],
+        'measure_4' => $form_state['storage']['measure_4'],
+        'measure_5' => $form_state['storage']['measure_5'],
+        'measure_6' => $form_state['storage']['measure_6'],
+        'measure_7' => $form_state['storage']['measure_7'],
+        'measure_8' => $form_state['storage']['measure_8'],
+        //Supplier scores
+        'score_1' => $form_state['storage']['score_1'],
+        'score_2' => $form_state['storage']['score_2'],
+        'score_3' => $form_state['storage']['score_3'],
+        'score_4' => $form_state['storage']['score_4'],
+        'score_5' => $form_state['storage']['score_5'],
+        'score_6' => $form_state['storage']['score_6'],
+        'score_7' => $form_state['storage']['score_7'],
+        'score_8' => $form_state['storage']['score_8'],
+        //Max scores
+        'max_score_1' => $form_state['storage']['max_score_1'],
+        'max_score_2' => $form_state['storage']['max_score_2'],
+        'max_score_3' => $form_state['storage']['max_score_3'],
+        'max_score_4' => $form_state['storage']['max_score_4'],
+        'max_score_5' => $form_state['storage']['max_score_5'],
+        'max_score_6' => $form_state['storage']['max_score_6'],
+        'max_score_7' => $form_state['storage']['max_score_7'],
+        'max_score_8' => $form_state['storage']['max_score_8'],
+        //Comments
+        'comments_1' => $form_state['storage']['comments_1'],
+        'comments_2' => $form_state['storage']['comments_2'],
+        'comments_3' => $form_state['storage']['comments_3'],
+        'comments_4' => $form_state['storage']['comments_4'],
+        'comments_5' => $form_state['storage']['comments_5'],
+        'comments_6' => $form_state['storage']['comments_6'],
+        'comments_7' => $form_state['storage']['comments_7'],
+        'comments_8' => $form_state['storage']['comments_8'],
+        'created_by' => $form_state['storage']['created_by'],
+        'create_date' => date('Ymd'),
+       ))
+
+        ->execute();
+
+  //Update the override to nothing in the company_x_supplier_maintenance table. This is done everytime a scorecard
+  //is created because a new scorecard equals no more override.
+  $last_scorecard_update = db_update('company_x_supplier_maintenance')
+     ->fields(array(
+             'next_scorecard_override' => '',
+             ))
+     ->condition('vendor', $form_state['storage']['supplier_number'], '=')
+     ->execute();
+
+  $supplier_number = $form_state['storage']['supplier_number'];
+  $supplier_year = $form_state['storage']['supplier_year'];
+  $source = $form_state['storage']['source'];
+  $filter_due_category = $form_state['storage']['due_category_passed_in'];
+  $filter_mill = $form_state['storage']['filter_mill'];
+  $filter_supplier = $form_state['storage']['filter_supplier'];
+  $filter_year = $form_state['storage']['filter_year'];
+
+  //Message variables to be passed to form
+  if ($source == '' | $source == 'None')
+  {
+      $source = 'None';
+  }
+
+  //Display completed form
+  drupal_goto('company_x_forms/form_scorecard/'. $id . '/' . $supplier_number . '/' . $supplier_year . '/' . $source . '/' . "Yes" . '/' . $filter_due_category . '/' . $filter_mill . '/' . $filter_supplier . '/' . $filter_year);
+}
+
+//****************************************************************************************************************
+//***********                                                                                          ***********
+//***********                                                                                          ***********
+//***********                               SCORECARD LIST STUFF                                       ***********
+//***********                                                                                          ***********
+//***********                                                                                          ***********
+//****************************************************************************************************************
+
+function scorecard_list($form, &$form_state, $filter_mill, $filter_supplier, $filter_year) {
+
+    drupal_set_title($title = "Scorecard List", $output = CHECK_PLAIN);
+    //Reset drupal messages
+    drupal_get_messages();
+
+    //Filters! Filters! Filters!
+
+    //Hardcoded mills.. blat
+    $mill_options = array('All'=>'All') + array('1001'=>'mill_x') + array('1550'=>'mill_y');
+
+    //If it is the first pass, then grab the user mill from their profile and use it as the default
+    if($form_state['run_once'] != "Yes")
+    {
+        if (empty($filter_mill))
+        {
+            //use the user default if a mill has not been passed in
+            $mill = get_user_mill();
+        }
+        else
+        {
+            //if one has been passed in then use it.
+            $mill = $filter_mill;
+        }
+
+        //for the first run assign filters passed in to use as the defaults. If none, use All
+        if (empty($filter_supplier))
+        {
+            $supplier_selected = 'All';
+        }
+        else
+        {
+            $supplier_selected = $filter_supplier;
+        }
+
+        if (empty($filter_year))
+        {
+            $supplier_year_selected = 'All';
+        }
+        else
+        {
+            $supplier_year_selected = $filter_year;
+        }
+    }
+
+    $form['mill'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $mill_options,
+     '#required' => FALSE,
+     '#prefix' => '<table id="general_filters_header"><tr><td width="10"><span class="beautytips" title="Select a mill to view only the suppliers associated with that Mill.">Mill: </span></td><td width="10">',
+     '#suffix' => '</td><td width="10"><span class="beautytips" title="Suppliers preceded with an Asterisk denote a relationship. Only relationships with at least one supplier in it from the selected mill will be shown in the drop down list.">Supplier: </span></td><td width="10">',
+     '#default_value' => $mill,
+     '#ajax' => array(
+        'callback' =>'ajax_scorecard_list_callback',
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+    //If it is not the first pass, get the value from the field
+    if($form_state['run_once'] == "Yes")
+    {
+        //use the user selected mill
+        $mill = $form_state['values']['mill'];
+    }
+
+    $supplier_options = array('All'=>'All') + combined_supplier_and_relationship_list($mill);
+
+    $form['supplier'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $supplier_options,
+     '#required' => FALSE,
+     '#prefix' => '<div id="supplier">',
+     '#suffix' => '</div>',
+     '#default_value' => $supplier_selected,
+     '#ajax' => array(
+        'callback' =>'ajax_scorecard_list_callback',
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+    //If it is not the first pass, get the value from the field
+    if($form_state['run_once'] == "Yes")
+    {
+        //use the user selected supplier
+        $supplier_selected = $form_state['values']['supplier'];
+    }
+
+    $form['year_start'] = array(
+        '#markup' => '</td><td width="10">Year: </td><td width="10">'
+    );
+
+    $supplier_year_options = array('All'=>'All') + return_scorecard_years($supplier_selected);
+
+    $form['supplier_year'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $supplier_year_options,
+     '#required' => FALSE,
+     '#prefix' => '<div id="supplier_year">',
+     '#suffix' => '</div>',
+     '#default_value' => $supplier_year_selected,
+     '#ajax' => array(
+        'callback' =>'ajax_scorecard_list_callback',
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+    //If it is not the first pass, get the value from the field
+    if($form_state['run_once'] == "Yes")
+    {
+        //use the user selected year
+        $supplier_year_selected = $form_state['values']['supplier_year'];
+    }
+
+
+     $form['create_new_scorecard_icon_start'] = array(
+         '#markup' => '<div id = "create_new_scorecard"><td class="general_filters_add_button"><span class="beautytips grow" title="Generate a Scorecard">',
+        );
+
+     $form['create_new_scorecard_icon'] = array(
+         '#markup' => '<a id="create_new_scorecard_icon" href="/company_x_forms/form_scorecard/0/0/0/0/0/0/' . $mill . '/' . $supplier_selected . '/' . $supplier_year_selected . '"><img src="/images/plus_icon.png"></a>',
+        );
+
+     $form['create_new_scorecard_icon_end'] = array(
+        '#markup' => '</span></td></tr></table>',
+     );
+
+     //Set the database table and get the data
+     $select = db_select('company_x_scorecards', 'g_unit');
+     $select ->fields('g_unit', array(
+                'id',
+		'supplier_name',
+                'supplier_number',
+                'mill',
+		'scorecard_start_date',
+		'scorecard_end_date',
+                'create_date'
+		));
+
+      //Set the conditions based on values collected from filters
+      //Mill
+
+
+      if ($mill == "" || $mill == "All")
+      {
+          //No filter thank you
+      }
+      else
+      {
+         $mill_conditions = array('1001/1550'=>'1001/1550') + array($mill=>$mill);
+         $select->condition('mill', $mill_conditions,'IN');
+      }
+
+      //Supplier
+      if ($supplier_selected == "" || $supplier_selected == "All")
+      {
+          //No filter thank you
+      }
+      else
+      {
+          $select->condition('supplier_number', $supplier_selected);
+      }
+
+      //Year
+      if ($supplier_year_selected == "" || $supplier_year_selected == "All")
+      {
+          //No filter thank you
+      }
+      else
+      {
+          $select->condition('supplier_year', $supplier_year_selected);
+      }
+
+
+    //Execute the query
+    $results = $select->execute();
+
+    //Configure the table rows, making the first column a link to view the details
+    $rows = array();
+    foreach ($results as $row) {
+        $rows[] = array(
+            '<div class="icon_container"><div class="icon_left"><span class="beautytips grow" title="View the Scorecard"><a href="/company_x_forms/form_scorecard/' . $row->id . '/0/0/0/0/0/' . $mill . '/' . $supplier_selected  . '/' . $supplier_year_selected . '">' . '<img src="/images/form_view_16x16.png">' . '</a></span></div>'.
+            '<div class="icon_right"><span class="beautytips grow" title="Delete the Scorecard"><a href="/scorecard_delete_confirmation/' . $row->id . '/' . $mill . '/' . $supplier_selected . '/' . $supplier_year_selected . '">' . '<img src="/images/trash_delete_16x16.png">' . '</a></span></div></div>',
+            $row->supplier_name,
+            $row->supplier_number,
+            $row->mill,
+            $row->scorecard_start_date,
+            $row->scorecard_end_date,
+            date_display_mask($row->create_date),
+        );
+    }
+
+    //Table settings. This is using the datatables module which talks to the jQuery plugin, Datatables
+    //We can talk to jQuery's Datatables with straight javascript too, like we did with tabs
+    //but time is short people, and so am I.
+
+    $attributes['datatable_options'] = array(
+      'bFilter'   => TRUE,
+      'bInfo'     => TRUE,
+      'autoWidth' => TRUE,
+      'scrollX' => TRUE,
+      'bStateSave' => TRUE,
+      'aaSorting' => array(
+                        array(6, 'desc'),
+                    ),
+    );
+
+    //Columns headers
+    $header = array(
+      array(
+        'data' => t(''),
+        'datatable_options' => array(
+          'bSortable' => FALSE,
+          'bSearchable' => FALSE,
+        ),
+      ),
+      array(
+        'data' => t('Supplier Name'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Supplier #'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Purchase Org'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Start Date'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('End Date'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Date Created'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+     );
+
+    // Render this mofo
+    $variables = array(
+      'attributes' => $attributes,
+      'header' => $header,
+      'rows' => $rows,
+    );
+
+    $output = theme('datatable', $variables);
+
+    $form['display_scorecard_data'] = array(
+         '#markup' => $output,
+         '#prefix' => '<div id="display_scorecard_data">',
+         '#suffix' => '</div>',
+        );
+
+//    $form['update_scorecard_create_date'] = array(
+//         '#type' => 'image_button',
+//         '#src' => '/images/calendar.png',
+//         '#submit' => array('update_scorecard_create_date'),
+//         '#prefix' => '<div><span class="beautytips" title="Update the scorecard created date.">',
+//         '#suffix' => '</span></div>',
+//        );
+
+    //Flag when the form has been run one time so we can do all sorts of cool things
+    $form_state['run_once'] = "Yes";
+
+    return $form;
+}//end of the scorecard list function
+
+//Scorecard List AJAX - parts of the form refreshed when the filters are changed
+function ajax_scorecard_list_callback($form, $form_state)
+{
+    //since we want to return multiple elements in multiple areas this array works just dandy
+    return array(
+        '#type' => 'ajax',
+        '#commands' => array(
+            ajax_command_replace("#display_scorecard_data", render($form['display_scorecard_data'])),
+            ajax_command_replace("#supplier", render($form['supplier'])),
+            ajax_command_replace("#supplier_year", render($form['supplier_year'])),
+            ajax_command_replace("#create_new_scorecard_icon", render($form['create_new_scorecard_icon'])),
+        )
+    );
+}//end of scorecard list ajax function
+
+//Called from the add (plus) button to create a new scorecard
+//function create_new_scorecard(){
+//    drupal_goto('company_x_forms/form_scorecard');
+//}
+
+//Called from the delete icon to confirm the scorecard deletion
+function scorecard_delete_confirmation($form, &$form_state, $scorecard_id, $filter_mill, $filter_supplier, $filter_year)
+{
+
+    //Get the associated data to populate the delete confirmation form
+    $query = db_select('company_x_scorecards', 'g');
+    $query->fields('g', array(
+        'supplier_name',
+        'supplier_number',
+        'create_date',
+        'scorecard_start_date',
+        'scorecard_end_date',
+        ))
+    ->condition('id', $scorecard_id, '=');
+
+    $result = $query->execute();
+
+    //$rows = array();
+    foreach ($result as $row) {
+        $supplier_name = $row->supplier_name;
+        $supplier_number = $row->supplier_number;
+        $scorecard_create_date = $row->create_date;
+        $scorecard_start_date = $row->scorecard_start_date;
+        $scorecard_end_date = $row->scorecard_end_date;
+    }//end for each
+
+    //Display the delete confirmation form
+    $form['confirmation_fieldset'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Are you sure you want to delete this scorecard?'),
+    );
+
+    $form['confirmation_fieldset']['scorecard_details'] = array(
+        '#markup' => 'Supplier: ' .$supplier_name. '<br>
+                    Supplier #: ' .$supplier_number. '<br>
+                    Create Date: ' . date_display_mask($scorecard_create_date) . '<br>
+                    Start Date: ' .$scorecard_start_date. '<br>
+                    End Date: ' .$scorecard_end_date
+    );
+
+    $form['delete'] = array(
+        '#type' => 'image_button',
+        '#src' => '/images/trash_can_delete_32x32.png',
+        '#submit' => array('delete_scorecard'),
+        '#prefix' => '<span id="action_icon" class="beautytips grow" title="Delete the Scorecard">',
+        '#suffix' => '</span>',
+    );
+
+    $form['back_to_scorecard_list'] = array(
+     '#prefix' => '<span id="action_icon" class="beautytips grow" title="Cancel delete and return to the Scorecard list">',
+     '#markup' => '<a href="/scorecard_list/' . $filter_mill . '/' . $filter_supplier . '/' . $filter_year . '"><img src="/images/go_back_6.png"></a>',
+     '#suffix' => '</span>',
+    );
+
+    //Store the scorecard id and supplier name, and filters so they can be used in the delete function
+    $form_state['storage']['scorecard_id'] = $scorecard_id;
+    $form_state['storage']['supplier_name'] = $supplier_name;
+    $form_state['storage']['filter_mill'] = $filter_mill;
+    $form_state['storage']['filter_supplier'] = $filter_supplier;
+    $form_state['storage']['filter_year'] = $filter_year;
+
+    return $form;
+}//end of the scorecard delete confirmation function
+
+function delete_scorecard($form, &$form_state)
+{
+    //Retrieve the scorecard ID and supplier name
+    $scorecard_id = $form_state['storage']['scorecard_id'];
+    $supplier_name = $form_state['storage']['supplier_name'];
+    $filter_mill = $form_state['storage']['filter_mill'];
+    $filter_supplier = $form_state['storage']['filter_supplier'];
+    $filter_year = $form_state['storage']['filter_year'];
+
+    //Delete the record
+    $delete_record = db_delete('company_x_scorecards')
+        ->condition('id', $scorecard_id,'=' )
+        ->execute();
+
+    drupal_goto('scorecard_list' . '/' . $filter_mill . '/' . $filter_supplier . '/' . $filter_year);
+}//end of the scorecard delete function
+
+//****************************************************************************************************************
+//***********                                                                                          ***********
+//***********                                                                                          ***********
+//***********                       SCORECARD MODULE PERMISSIONS                                       ***********
+//***********                                                                                          ***********
+//***********                                                                                          ***********
+//****************************************************************************************************************
+function form_scorecard_permission() {
+    return array(
+        'QCA Scorecard Access' => array(
+            'title' => t('QCA Scorecard Access'),
+            'description' => t('Allows users to access the Scorecard.'),
+        ),
+
+        'QCA Scorecard List Access' => array(
+            'title' => t('QCA Scorecard List Access'),
+            'description' => t('Allows users to access the Scorecard List.'),
+        ),
+
+        'QCA Scorecard Confirm Delete Access' => array(
+            'title' => t('QCA Scorecard Confirm Delete Access'),
+            'description' => t('Allows users to access the Confirm Delete form.'),
+        ),
+    );
+}

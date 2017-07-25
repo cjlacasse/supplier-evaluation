@@ -1,0 +1,3093 @@
+<?php
+
+    function supplier_action_communication_menu() {
+      $items = array();
+
+      //The giant SAC dynamic form
+      $items['supplier_action_communication_form'] = array(
+        'title' => 'Supplier Action Communication',
+        'description' => 'Supplier Action Communication Form',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('supplier_action_communication_form',1,2,3,4,5,6),//$sac_id, $after_submit, $filter_mill, $filter_supplier, $filter_type, $filter_status
+        'access callback' => 'user_access',
+        'access arguments' => array('QCA Supplier Action Communication Form Access'),
+      );
+
+      //The SAC display for both mills
+      $items['supplier_action_communication_list'] = array(
+        'title' => 'Supplier Action Communication List',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('supplier_action_communication_list_form'),
+        'access callback' => 'user_access',
+        'access arguments' => array('QCA Supplier Action Communication List Access'),
+      );
+
+      //SAC field values management
+      $items['sac_field_values_management'] = array(
+        'title' => 'Supplier Action Communication Field Management',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('sac_field_values_management'),
+        'access callback' => 'user_access',
+        'access arguments' => array('QCA Supplier Action Communication Field Management Access'),
+      );
+
+      //SAC delete field value
+      $items['sac_delete_field_value/nojs/%'] = array(
+        'page callback' => 'sac_delete_field_value',
+        'page arguments' => array(1,2,3),
+        'access arguments' => array('QCA Supplier Action Communication Field Value Delete Access'),
+        'type' => MENU_CALLBACK,
+      );
+
+      $items['sac_delete_field_value/ajax/%'] = array(
+        'delivery callback' => 'ajax_deliver',
+      ) + $items['sac_delete_field_value/nojs/%'];
+
+      //SAC add field value
+      $items['sac_add_field_value/nojs/%'] = array(
+        'page callback' => 'sac_add_field_value',
+        'page arguments' => array(1,2,3),
+        'access arguments' => array('QCA Supplier Action Communication Field Value Add Access'),
+        'type' => MENU_CALLBACK,
+      );
+
+      $items['sac_add_field_value/ajax/%'] = array(
+        'delivery callback' => 'ajax_deliver',
+      ) + $items['sac_add_field_value/nojs/%'];
+
+      return $items;
+    }
+
+    //**********************************************************************************************************
+    //*****                                                                                                *****
+    //*****                         SUPPLIER ACTION COMMUNICATION FORM STUFF                               *****
+    //*****                                                                                                *****
+    //**********************************************************************************************************
+
+    //***SUPPLIER ACTION COMMUNICATION FORM***
+    function supplier_action_communication_form($form, &$form_state, $sac_id, $after_submit, $filter_mill, $filter_supplier, $filter_type, $filter_status) {
+
+        //set a form element equal to the sac id passed in, so it can be used throughout the form functions
+        $form_state['storage']['sac_id'] = $sac_id;
+
+        //Get the user info so we can record who created it or modified it
+        global $user;
+        $account_id = ($user->uid);
+
+        //Get user first name
+        $first_name_query = db_select('field_data_field_first_name', 'fn')
+          ->condition('fn.entity_id', $account_id, '=' )
+          ->fields('fn', array('field_first_name_value'));
+
+        //Execute query
+        $first_name_result = array();
+        $first_name_result = $first_name_query->execute()->fetchField();
+
+        //Get user last name
+        $last_name_query = db_select('field_data_field_last_name', 'ln')
+          ->condition('ln.entity_id', $account_id )
+          ->fields('ln', array('field_last_name_value'));
+
+        //Execute query
+        $last_name_result = array();
+        $last_name_result = $last_name_query->execute()->fetchField();
+
+        //if $sac_id is not empty, then the form exists. Open form with existing data from the db.
+        if(!empty($sac_id) AND $form_state['run_once'] != "Yes")
+        {
+            //Assign the user to a variable so we can record who modified it
+            $sac_modified_by = $first_name_result . " " . $last_name_result;
+            //assign it to whatever this is so we can use it in other functions
+            $form_state['storage']['sac_modified_by'] = $sac_modified_by;
+
+            $date_modified = date('n/j/Y');
+
+            //Pull the sac data for the specified sac id
+            //Identify table and return desired fields
+              $query = db_select('company_x_supplier_action_communication', 'g')
+                ->condition('id', $sac_id)
+                ->fields('g', array(
+                    sac_recorder,
+                    sac_create_date,
+                    sac_last_modified_by,
+                    sac_last_modified_date,
+                    sac_mill,
+                    sac_mill_area,
+                    sac_entry_type,
+                    sac_supplier,
+                    sac_supplier_number,
+                    sac_status,
+                    cs_entry_type,
+                    cs_material_number,
+                    cs_material_description,
+                    cs_ci_type_of_task,
+                    cs_ci_action_item,
+                    cs_ci_impact_potential,
+                    cs_ci_estimated_cost_impact,
+                    cs_ci_form_of_savings,
+                    cs_ci_impact,
+                    cs_ci_ops_lead,
+                    cs_ci_ci_lead,
+                    cs_ci_ci_category,
+                    cs_ci_class,
+                    cs_ci_person_responsible,
+                    cs_ci_original_due_date,
+                    cs_ci_revised_due_date,
+                    cs_ci_next_steps,
+                    cs_process_type_of_task,
+                    cs_process_action_item,
+                    cs_process_impact_potential,
+                    cs_process_estimated_cost_impact,
+                    cs_process_form_of_savings,
+                    cs_process_impact,
+                    cs_process_ops_lead,
+                    cs_process_ci_lead,
+                    cs_process_ci_category,
+                    cs_process_class,
+                    cs_process_person_responsible,
+                    cs_process_original_due_date,
+                    cs_process_revised_due_date,
+                    cs_process_next_steps,
+                    cs_trial_start_date,
+                    cs_trial_end_date,
+                    cs_trial_type_of_task,
+                    cs_trial_action_item,
+                    cs_trial_impact_potential,
+                    cs_trial_estimated_cost_impact,
+                    cs_trial_form_of_savings,
+                    cs_trial_impact,
+                    cs_trial_ops_lead,
+                    cs_trial_ci_lead,
+                    cs_trial_ci_category,
+                    cs_trial_class,
+                    cs_trial_person_responsible,
+                    cs_trial_original_due_date,
+                    cs_trial_revised_due_date,
+                    cs_trial_next_steps,
+                    ci_provisional_supplier,
+                    ci_problem_description,
+                    ci_root_cause,
+                    ci_person_responsible,
+                    ci_urgency_of_response,
+                    ci_due_date,
+                    ci_corrective_action,
+                    ci_outcome_comments,
+                    ci_follow_up_date,
+                    ci_create_sdr,
+                    ci_create_rcfa,
+                    ci_sdr_pd_sap_po_number,
+                    ci_sdr_pd_name_of_discrepant_material,
+                    ci_sdr_pd_date_received,
+                    ci_sdr_pd_lot_number,
+                    ci_sdr_pd_nonconformance_description,
+                    ci_sdr_pd_nonconformance_detail,
+                    ci_sdr_pd_sent_to_stakeholder,
+                    ci_sdr_pd_approved_by_stakeholder,
+                    ci_sdr_qa_sdr_number,
+                    ci_sdr_qa_date_received,
+                    ci_sdr_qa_final_disposition,
+                    ci_sdr_qa_raw_material_nonconformance_notice,
+                    ci_sdr_qa_quality_engineer,
+                    ci_rcfa_glt_purchasing_contract,
+                    ci_rcfa_date_submitted,
+                    ci_rcfa_approved_by_stakeholder,
+                    ci_rcfa_supplier_contact,
+                    ci_rcfa_response_due,
+                    ci_rcfa_response_date,
+                    ci_rcfa_submitted_by,
+                    ci_rcfa_supplier_details,
+                    ci_rcfa_sent_to_stakeholder,
+                    ci_rcfa_approved_by_stakeholder,
+                    ci_rcfa,
+                    ci_ca,
+                    ci_rcfa_course_of_action,
+                    trial_entry_type,
+                    trial_new_material_supplier,
+                    trial_new_material_description,
+                    trial_new_start_date,
+                    trial_new_end_date,
+                    trial_new_outcome_comments,
+                    trial_replace_material_number,
+                    trial_replace_material_description,
+                    trial_replace_start_date,
+                    trial_replace_end_date,
+                    trial_replace_outcome_comments));
+              $results = $query->execute();
+
+              //Cycle through the records and assign the data to variables
+              foreach ($results as $result)
+              {
+                $sac_recorder = $result-> sac_recorder;
+                $sac_create_date = $result-> sac_create_date;
+                $sac_last_modified_by = $result-> sac_last_modified_by;
+                $sac_last_modified_date = $result-> sac_last_modified_date;
+                $sac_mill = $result-> sac_mill;
+                $sac_mill_area = $result-> sac_mill_area;
+                $sac_entry_type = $result-> sac_entry_type;
+                $sac_supplier = $result-> sac_supplier;
+                $sac_supplier_number = $result-> sac_supplier_number;
+                $sac_status = $result-> sac_status;
+                $cs_entry_type = $result-> cs_entry_type;
+                $cs_material_number = $result-> cs_material_number;
+                $cs_material_description = $result-> cs_material_description;
+                $cs_ci_type_of_task = $result-> cs_ci_type_of_task;
+                $cs_ci_action_item = $result-> cs_ci_action_item;
+                $cs_ci_impact_potential = $result-> cs_ci_impact_potential;
+                $cs_ci_estimated_cost_impact = $result-> cs_ci_estimated_cost_impact;
+                $cs_ci_form_of_savings = $result-> cs_ci_form_of_savings;
+                $cs_ci_impact = $result-> cs_ci_impact;
+                $cs_ci_ops_lead = $result-> cs_ci_ops_lead;
+                $cs_ci_ci_lead = $result-> cs_ci_ci_lead;
+                $cs_ci_ci_category = $result-> cs_ci_ci_category;
+                $cs_ci_class = $result-> cs_ci_class;
+                $cs_ci_person_responsible = $result-> cs_ci_person_responsible;
+                $cs_ci_original_due_date = $result-> cs_ci_original_due_date;
+                $cs_ci_revised_due_date = $result-> cs_ci_revised_due_date;
+                $cs_ci_next_steps = $result-> cs_ci_next_steps;
+                $cs_process_type_of_task = $result-> cs_process_type_of_task;
+                $cs_process_action_item = $result-> cs_process_action_item;
+                $cs_process_impact_potential = $result-> cs_process_impact_potential;
+                $cs_process_estimated_cost_impact = $result-> cs_process_estimated_cost_impact;
+                $cs_process_form_of_savings = $result-> cs_process_form_of_savings;
+                $cs_process_impact = $result-> cs_process_impact;
+                $cs_process_ops_lead = $result-> cs_process_ops_lead;
+                $cs_process_ci_lead = $result-> cs_process_ci_lead;
+                $cs_process_ci_category = $result-> cs_process_ci_category;
+                $cs_process_class = $result-> cs_process_class;
+                $cs_process_person_responsible = $result-> cs_process_person_responsible;
+                $cs_process_original_due_date = $result-> cs_process_original_due_date;
+                $cs_process_revised_due_date = $result-> cs_process_revised_due_date;
+                $cs_process_next_steps = $result-> cs_process_next_steps;
+                $cs_trial_start_date = $result-> cs_trial_start_date;
+                $cs_trial_end_date = $result-> cs_trial_end_date;
+                $cs_trial_type_of_task = $result-> cs_trial_type_of_task;
+                $cs_trial_action_item = $result-> cs_trial_action_item;
+                $cs_trial_impact_potential = $result-> cs_trial_impact_potential;
+                $cs_trial_estimated_cost_impact = $result-> cs_trial_estimated_cost_impact;
+                $cs_trial_form_of_savings = $result-> cs_trial_form_of_savings;
+                $cs_trial_impact = $result-> cs_trial_impact;
+                $cs_trial_ops_lead = $result-> cs_trial_ops_lead;
+                $cs_trial_ci_lead = $result-> cs_trial_ci_lead;
+                $cs_trial_ci_category = $result-> cs_trial_ci_category;
+                $cs_trial_class = $result-> cs_trial_class;
+                $cs_trial_person_responsible = $result-> cs_trial_person_responsible;
+                $cs_trial_original_due_date = $result-> cs_trial_original_due_date;
+                $cs_trial_revised_due_date = $result-> cs_trial_revised_due_date;
+                $cs_trial_next_steps = $result-> cs_trial_next_steps;
+                $ci_provisional_supplier = $result-> ci_provisional_supplier;
+                $ci_problem_description = $result-> ci_problem_description;
+                $ci_root_cause = $result-> ci_root_cause;
+                $ci_person_responsible = $result-> ci_person_responsible;
+                $ci_urgency_of_response = $result-> ci_urgency_of_response;
+                $ci_due_date = $result-> ci_due_date;
+                $ci_corrective_action = $result-> ci_corrective_action;
+                $ci_outcome_comments = $result-> ci_outcome_comments;
+                $ci_follow_up_date = $result-> ci_follow_up_date;
+                $ci_create_sdr = $result-> ci_create_sdr;
+                $ci_create_rcfa = $result-> ci_create_rcfa;
+                $ci_sdr_pd_sap_po_number = $result-> ci_sdr_pd_sap_po_number;
+                $ci_sdr_pd_name_of_discrepant_material = $result-> ci_sdr_pd_name_of_discrepant_material;
+                $ci_sdr_pd_date_received = $result-> ci_sdr_pd_date_received;
+                $ci_sdr_pd_lot_number = $result-> ci_sdr_pd_lot_number;
+                //serial
+                $ci_sdr_pd_nonconformance_description_serial = $result-> ci_sdr_pd_nonconformance_description;
+                $ci_sdr_pd_nonconformance_description = unserialize($ci_sdr_pd_nonconformance_description_serial);
+                $ci_sdr_pd_nonconformance_detail = $result-> ci_sdr_pd_nonconformance_detail;
+                $ci_sdr_pd_sent_to_stakeholder = $result-> ci_sdr_pd_sent_to_stakeholder;
+                $ci_sdr_pd_approved_by_stakeholder = $result-> ci_sdr_pd_approved_by_stakeholder;
+                $ci_sdr_qa_sdr_number = $result-> ci_sdr_qa_sdr_number;
+                $ci_sdr_qa_date_received = $result-> ci_sdr_qa_date_received;
+                //serial
+                $ci_sdr_qa_final_disposition_serial = $result-> ci_sdr_qa_final_disposition;
+                $ci_sdr_qa_final_disposition = unserialize($ci_sdr_qa_final_disposition_serial);
+                $ci_sdr_qa_raw_material_nonconformance_notice = $result-> ci_sdr_qa_raw_material_nonconformance_notice;
+                $ci_sdr_qa_quality_engineer = $result-> ci_sdr_qa_quality_engineer;
+                $ci_rcfa_glt_purchasing_contract = $result-> ci_rcfa_glt_purchasing_contract;
+                $ci_rcfa_date_submitted = $result-> ci_rcfa_date_submitted;
+                $ci_rcfa_approved_by_stakeholder = $result-> ci_rcfa_approved_by_stakeholder;
+                $ci_rcfa_supplier_contact = $result-> ci_rcfa_supplier_contact;
+                $ci_rcfa_response_due = $result-> ci_rcfa_response_due;
+                $ci_rcfa_response_date = $result-> ci_rcfa_response_date;
+                $ci_rcfa_submitted_by = $result-> ci_rcfa_submitted_by;
+                $ci_rcfa_supplier_details = $result-> ci_rcfa_supplier_details;
+                $ci_rcfa_sent_to_stakeholder = $result-> ci_rcfa_sent_to_stakeholder;
+                $ci_rcfa_approved_by_stakeholder = $result-> ci_rcfa_approved_by_stakeholder;
+                $ci_rcfa = $result-> ci_rcfa;
+                $ci_ca = $result-> ci_ca;
+                $ci_rcfa_course_of_action = $result-> ci_rcfa_course_of_action;
+                $trial_entry_type = $result-> trial_entry_type;
+                $trial_new_material_supplier = $result-> trial_new_material_supplier;
+                $trial_new_material_description = $result-> trial_new_material_description;
+                $trial_new_start_date = $result-> trial_new_start_date;
+                $trial_new_end_date = $result-> trial_new_end_date;
+                $trial_new_outcome_comments = $result-> trial_new_outcome_comments;
+                $trial_replace_material_number = $result-> trial_replace_material_number;
+                $trial_replace_material_description = $result-> trial_replace_material_description;
+                $trial_replace_start_date = $result-> trial_replace_start_date;
+                $trial_replace_end_date = $result-> trial_replace_end_date;
+                $trial_replace_outcome_comments = $result-> trial_replace_outcome_comments;
+              }
+
+              //Populate supplier options based on mill
+              $sac_supplier_options = array('Select'=>'-Select-') + combined_supplier_and_relationship_list($sac_mill,'sac');
+
+            //If this is called after the sac is submitted, show the save message.  This is done here since we are using a
+            //drupal_goto in submit to show the completed form and the user never sees the message if its in the submit function.
+            if($after_submit == "Yes")
+            {
+                $message = 'The supplier action communication for ' . $sac_supplier . ' has been saved.'.
+                '&nbsp; &nbsp; &nbsp; <span class="beautytips" title="Return to the Supplier Action Communications List"><a href="/supplier_action_communication_list/' . $filter_mill . '/' . $filter_supplier . '/' . $filter_type . '/' . $filter_status . '">' . '<img style="vertical-align:middle" src="/images/go_back_save.png"></span></a>';
+
+                drupal_set_message($message, $type = 'status', $repeat = TRUE);
+            }//end checking to see if this was called after a submit
+
+        }//end populating existing form
+
+        //if $sac_id is empty treat this as a new form and set the one time values.
+        else
+        {
+            //Assign default values for new form
+            $sac_status = "Open";
+            $sac_supplier_number = "(select supplier to populate)";
+            $ci_provisional_supplier = "(select supplier to populate)";
+            $cs_material_description = "(select material number to populate)";
+            $trial_replace_material_description = "(select material to populate)";
+
+            //Assign the user to a variable so we can record who created it
+            $sac_recorder = $first_name_result . " " . $last_name_result;
+            //assign it to whatever this is so we can use it in other functions
+            $form_state['storage']['sac_recorder'] = $sac_recorder;
+
+            //Get user mill
+            $sac_mill = get_user_mill();
+
+            //Set the default supplier options based on mill
+            $sac_supplier_options = array('Select'=>'-Select-') + combined_supplier_and_relationship_list($sac_mill,'sac');
+
+            //Date created
+            $sac_create_date = date('n/j/Y');
+        }//end populating new form data
+
+
+       //***Display The fields***
+
+       //Overview
+       $form['fs_sac_overview'] = array(
+         '#type' => 'fieldset',
+         '#title' => t('Overview'),
+       );
+
+       $form['fs_sac_overview']['sac_overview'] = array(
+         '#markup' => t('The Supplier Action Communication form is used to document concerns, cost savings, and product trials.'),
+       );
+
+       //*********GENERAL SECTION**********
+       if(!empty($sac_last_modified_by))
+       {
+
+           $form['sac_recorder'] = array(
+           '#markup' => '<div id="sac_header_container"><div id="sac_header_left"> Created by '. $sac_recorder .' on '. date("m-d-Y", strtotime($sac_create_date)) .'</div><div id="sac_header_right">Last modified by ' . $sac_last_modified_by . ' on ' . date("m-d-Y", strtotime($sac_last_modified_date)) . '</div></div>'
+           );
+       }
+       else
+       {
+           $form['sac_recorder'] = array(
+           '#markup' => '<div id="sac_header_container"><div id="sac_header_complete"> Created by '. $sac_recorder .' on '. date("m-d-Y", strtotime($sac_create_date)) .'</div></div>'
+           );
+       }
+
+       $form['open_sac_container'] = array(
+         '#markup' => '<div id="sac_container">'
+       );
+
+       //Probably a better way to grab the mills (joint query maybe) but Im going to start with hardcoding them
+       $sac_mill_options = array('1001'=>'mill_x') + array('1550'=>'mill_y');
+
+       $form['sac_mill'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $sac_mill_options,
+         '#required' => FALSE,
+	 '#prefix' => '<div class="sac_row"><div class="sac_column_1"><span class="beautytips" title="Workflow for the Supplier Action Communication Form is based on mill.">Mill: </span></div><div class="sac_column_2">',
+  	 '#suffix' => '</div></div>',
+	 '#default_value' => $sac_mill,
+         '#ajax' => array(
+            'callback' =>'ajax_mill_info_callback',
+            'method' => 'replace',
+            'effect' => 'none',
+         ),
+       );
+
+       //Get the value of mill.  If its the first run, don't do anything and use the mill defined at the top
+       if ($form_state['run_once'] != "Yes")
+       {
+           //then dont do a thing
+       }
+       else
+       {
+           $sac_mill = $form_state['values']['sac_mill'];
+       }
+
+       $sac_mill_area_keyword = "sac_mill_area";
+       $sac_mill_area_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($sac_mill_area_keyword);
+
+       $form['sac_mill_area'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $sac_mill_area_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Mill Area: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $sac_mill_area,
+       );
+
+       $sac_entry_type_keyword = "sac_entry_type";
+       $sac_entry_type_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($sac_entry_type_keyword);
+
+       $form['sac_entry_type'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $sac_entry_type_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Type: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $sac_entry_type,
+         '#attributes' => array(
+             'id' => 'sac_entry_type',
+             'onchange' => 'sac_entry_type_display(this.selectedIndex)'
+             )
+        );
+
+       //return list of suppliers based on mill
+       //If its the first run, don't do anything and use the list of suppliers defined at the top
+       if ($form_state['run_once'] != "Yes")
+       {
+           //then dont do a thing
+       }
+       else
+       {
+           $sac_supplier_options = array('Select'=>'-Select-') + combined_supplier_and_relationship_list($sac_mill,'sac');
+       }
+
+       $form['sac_supplier'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $sac_supplier_options,
+         '#required' => FALSE,
+         '#prefix' => '<div id="sac_supplier"><div class="sac_row"><div class="sac_column_1"><span class="beautytips" title="Suppliers preceded with an Asterisk denote a relationship. Only relationships without suppliers from multiple mills will be shown in the drop down list.">Supplier: </span></div><div class="sac_column_2">',
+         '#suffix' => '</div></div></div>',
+         '#default_value' => $sac_supplier_number,
+         '#ajax' => array(
+            'callback' =>'ajax_supplier_info_callback', //callback tag
+            'method' => 'replace',
+            'effect' => 'none',
+            'progress' => array('type' => 'none'),
+         ),
+       );
+
+       //populate the supplier id based on the id contained in the supplier array
+       //if its an existing doc we need to ignore this on the first run so it uses the
+       //data pulled at the top
+       if ($form_state['run_once'] != "Yes")
+       {
+       //then dont do a thing
+       }
+       else
+       {
+          $sac_supplier_number = $form_state['values']['sac_supplier'];
+       }
+
+       $form_state['storage']['sac_supplier_number_value'] = $sac_supplier_number;
+
+       $form['sac_supplier_number'] = array(
+         '#markup' => '<div class="sac_row"><div class="sac_column_1_text">Supplier ID: </div><div class="sac_column_2">'. $sac_supplier_number .'</div></div>',
+       	 '#prefix' => '<div id="sac_supplier_number">',
+         '#suffix' => '</div>',
+       );
+
+       //************COST SAVINGS FIELDS***************
+       $form['start_cost_savings_section'] = array(
+         '#type' => 'markup',
+         '#markup' => '<div id="sac_cost_savings_section">',
+       );
+
+       $cs_entry_type_keyword = "cs_entry_type";
+       $cs_entry_type_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_entry_type_keyword);
+
+       $form['cs_entry_type'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_entry_type_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Cost Savings Type: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_entry_type,
+         '#attributes' => array(
+             'id' => 'cs_entry_type',
+             'onchange' => 'cs_entry_type_display(this.selectedIndex)'
+          ),
+        );
+
+       //get the material numbers based on the supplier number
+       $cs_material_number_options = array('Select'=>'-Select-') + get_material_numbers_from_delivery_table($sac_supplier_number);
+
+       $form['cs_material_number'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_material_number_options,
+         '#required' => FALSE,
+         '#prefix' => '<div id="cs_material_number"><div class="sac_row"><div class="sac_column_1">Material Number: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div></div>',
+         '#default_value' => $cs_material_number,
+         '#ajax' => array(
+            'callback' =>'ajax_material_info_callback', //callback tag
+            'method' => 'replace',
+            'effect' => 'none',
+            'progress' => array('type' => 'none'),
+         ),
+       );
+
+       //get the material description based on the material number
+       //if its a new doc then grab it from the field, otherwise use the one grabbed from the DB above
+       if ($form_state['run_once'] != "Yes")
+       {
+       //then dont do a thing
+       }
+       else
+       {
+          $cs_selected_material_number = $form_state['values']['cs_material_number'];
+          $cs_material_description = get_material_description_from_delivery_table($cs_selected_material_number);
+       }
+
+       $form_state['storage']['cs_material_description_value'] = $cs_material_description;
+
+       $form['cs_material_description'] = array(
+         '#markup' => '<div class="sac_row"><div class="sac_column_1_text">Material Description: </div><div class="sac_column_2">'. $cs_material_description .'</div></div>',
+         '#prefix' => '<div id="cs_material_description">',
+         '#suffix' => '</div>',
+       );
+
+       //Continuous Improvement option
+       $form['start_cs_continuous_improvement_section'] = array(
+         '#markup' => '<div id="cs_continuous_improvement_section">'
+       );
+
+       $cs_ci_type_of_task_keyword = "cs_ci_type_of_task";
+       $cs_ci_type_of_task_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_ci_type_of_task_keyword);
+
+       $form['cs_ci_type_of_task'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_ci_type_of_task_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Type of Task: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_ci_type_of_task,
+       );
+
+       $form['cs_ci_action_item'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Action Item: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_ci_action_item,
+       );
+
+       $cs_ci_impact_potential_keyword = "cs_ci_impact_potential";
+       $cs_ci_impact_potential_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_ci_impact_potential_keyword);
+
+       $form['cs_ci_impact_potential'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_ci_impact_potential_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Impact Potential: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_ci_impact_potential,
+       );
+
+       $form['cs_ci_estimated_cost_impact'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Estimated Cost Impact: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_ci_estimated_cost_impact,
+       );
+
+       $cs_ci_form_of_savings_keyword = "cs_ci_form_of_savings";
+       $cs_ci_form_of_savings_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_ci_form_of_savings_keyword);
+
+       $form['cs_ci_form_of_savings'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_ci_form_of_savings_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Form of Savings: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_ci_form_of_savings,
+       );
+
+       $cs_ci_impact_keyword = "cs_ci_impact";
+       $cs_ci_impact_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_ci_impact_keyword);
+
+       $form['cs_ci_impact'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_ci_impact_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Impact: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_ci_impact,
+       );
+
+       $form['cs_ci_ops_lead'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Ops Lead: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_ci_ops_lead,
+       );
+
+       $form['cs_ci_ci_lead'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">CI Lead: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_ci_ci_lead,
+       );
+
+       $cs_ci_ci_category_keyword = "cs_ci_ci_category";
+       $cs_ci_ci_category_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_ci_ci_category_keyword);
+
+       $form['cs_ci_ci_category'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_ci_ci_category_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">CI Category: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_ci_ci_category,
+       );
+
+       $cs_ci_class_keyword = "cs_ci_class";
+       $cs_ci_class_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_ci_class_keyword);
+
+       $form['cs_ci_class'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_ci_class_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Class: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_ci_class,
+       );
+
+       $cs_ci_person_responsible_keyword = "cs_ci_person_responsible";
+       $cs_ci_person_responsible_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_ci_person_responsible_keyword);
+
+       $form['cs_ci_person_responsible'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_ci_person_responsible_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Person Responsible: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_ci_person_responsible,
+       );
+
+       $form['cs_ci_original_due_date'] = array(
+         '#type' => 'date_popup',
+         '#title' => '',
+         '#date_label_position' => 'none', //'above' the date part, 'within' it, or 'none', default is 'above'
+         '#date_format' => 'm/d/Y',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Original Due Date: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_ci_original_due_date,
+       );
+
+       $form['cs_ci_revised_due_date'] = array(
+         '#type' => 'date_popup',
+         '#title' => '',
+         '#date_label_position' => 'none', //'above' the date part, 'within' it, or 'none', default is 'above'
+         '#date_format' => 'm/d/Y',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Revised Due Date: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_ci_revised_due_date,
+       );
+
+       $form['cs_ci_next_steps'] = array(
+         '#type' => 'textarea',
+         '#maxlength' => 500,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Next Steps: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_ci_next_steps,
+       );
+
+       $form['end_cs_continuous_improvement_section'] = array(
+         '#markup' => '</div>'
+       );
+
+       //Process option
+       $form['start_cs_process_section'] = array(
+         '#markup' => '<div id="cs_process_section">'
+       );
+
+       $cs_process_type_of_task_keyword = "cs_process_type_of_task";
+       $cs_process_type_of_task_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_process_type_of_task_keyword);
+
+       $form['cs_process_type_of_task'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_process_type_of_task_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Type of Task: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_process_type_of_task,
+       );
+
+       $form['cs_process_action_item'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Action Item: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_process_action_item,
+       );
+
+       $cs_process_impact_potential_keyword = "cs_process_impact_potential";
+       $cs_process_impact_potential_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_process_impact_potential_keyword);
+
+       $form['cs_process_impact_potential'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_process_impact_potential_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Impact Potential: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_process_impact_potential,
+       );
+
+       $form['cs_process_estimated_cost_impact'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Estimated Cost Impact: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_process_estimated_cost_impact,
+       );
+
+       $cs_process_form_of_savings_keyword = "cs_process_form_of_savings";
+       $cs_process_form_of_savings_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_process_form_of_savings_keyword);
+
+       $form['cs_process_form_of_savings'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_process_form_of_savings_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Form of Savings: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_process_form_of_savings,
+       );
+
+       $cs_process_impact_keyword = "cs_process_impact";
+       $cs_process_impact_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_process_impact_keyword);
+
+       $form['cs_process_impact'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_process_impact_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Impact: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_process_impact,
+       );
+
+       $form['cs_process_ops_lead'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Ops Lead: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_process_ops_lead,
+       );
+
+       $form['cs_process_ci_lead'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">CI Lead: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_process_ci_lead,
+       );
+
+       $cs_process_ci_category_keyword = "cs_process_ci_category";
+       $cs_process_ci_category_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_process_ci_category_keyword);
+
+       $form['cs_process_ci_category'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_process_ci_category_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">CI Category: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_process_ci_category,
+       );
+
+       $cs_process_class_keyword = "cs_process_class";
+       $cs_process_class_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_process_class_keyword);
+
+       $form['cs_process_class'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_process_class_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Class: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_process_class,
+       );
+
+       $cs_process_person_responsible_keyword = "cs_process_person_responsible";
+       $cs_process_person_responsible_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_process_person_responsible_keyword);
+
+       $form['cs_process_person_responsible'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_process_person_responsible_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Person Responsible: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_process_person_responsible,
+       );
+
+       $form['cs_process_original_due_date'] = array(
+         '#type' => 'date_popup',
+         '#title' => '',
+         '#date_label_position' => 'none', //'above' the date part, 'within' it, or 'none', default is 'above'
+         '#date_format' => 'm/d/Y',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Original Due Date: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_process_original_due_date,
+       );
+
+       $form['cs_process_revised_due_date'] = array(
+         '#type' => 'date_popup',
+         '#title' => '',
+         '#date_label_position' => 'none', //'above' the date part, 'within' it, or 'none', default is 'above'
+         '#date_format' => 'm/d/Y',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Revised Due Date: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_process_revised_due_date,
+       );
+
+       $form['cs_process_next_steps'] = array(
+         '#type' => 'textarea',
+         '#maxlength' => 500,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Next Steps: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_process_next_steps,
+       );
+
+       $form['end_cs_process_section'] = array(
+         '#markup' => '</div>'
+       );
+
+       //Trial option
+       $form['start_cs_trial_section'] = array(
+         '#markup' => '<div id="cs_trial_section">'
+       );
+
+       $form['cs_trial_start_date'] = array(
+         '#type' => 'date_popup',
+         '#title' => '',
+         '#date_label_position' => 'none', //'above' the date part, 'within' it, or 'none', default is 'above'
+         '#date_format' => 'm/d/Y',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Trial Start Date: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_trial_start_date,
+       );
+
+       $form['cs_trial_end_date'] = array(
+         '#type' => 'date_popup',
+         '#title' => '',
+         '#date_label_position' => 'none', //'above' the date part, 'within' it, or 'none', default is 'above'
+         '#date_format' => 'm/d/Y',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Trial End Date: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_trial_end_date,
+       );
+
+       $cs_trial_type_of_task_keyword = "cs_trial_type_of_task";
+       $cs_trial_type_of_task_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_trial_type_of_task_keyword);
+
+       $form['cs_trial_type_of_task'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_trial_type_of_task_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Type of Task: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_trial_type_of_task,
+       );
+
+       $form['cs_trial_action_item'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Action Item: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_trial_action_item,
+       );
+
+       $cs_trial_impact_potential_keyword = "cs_trial_impact_potential";
+       $cs_trial_impact_potential_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_trial_impact_potential_keyword);
+
+       $form['cs_trial_impact_potential'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_trial_impact_potential_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Impact Potential: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_trial_impact_potential,
+       );
+
+       $form['cs_trial_estimated_cost_impact'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Estimated Cost Impact: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_trial_estimated_cost_impact,
+       );
+
+       $cs_trial_form_of_savings_keyword = "cs_trial_form_of_savings";
+       $cs_trial_form_of_savings_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_trial_form_of_savings_keyword);
+
+       $form['cs_trial_form_of_savings'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_trial_form_of_savings_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Form of Savings: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_trial_form_of_savings,
+       );
+
+       $cs_trial_impact_keyword = "cs_trial_impact";
+       $cs_trial_impact_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_trial_impact_keyword);
+
+       $form['cs_trial_impact'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_trial_impact_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Impact: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_trial_impact,
+       );
+
+       $form['cs_trial_ops_lead'] = array(
+         '#type' => 'textfield',
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Ops Lead: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_trial_ops_lead,
+       );
+
+       $form['cs_trial_ci_lead'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">CI Lead: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_trial_ci_lead,
+       );
+
+       $cs_trial_ci_category_keyword = "cs_trial_ci_category";
+       $cs_trial_ci_category_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_trial_ci_category_keyword);
+
+       $form['cs_trial_ci_category'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_trial_ci_category_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">CI Category: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_trial_ci_category,
+       );
+
+       $cs_trial_class_keyword = "cs_trial_class";
+       $cs_trial_class_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_trial_class_keyword);
+
+       $form['cs_trial_class'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_trial_class_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Class: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_trial_class,
+       );
+
+       $cs_trial_person_responsible_keyword = "cs_trial_person_responsible";
+       $cs_trial_person_responsible_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($cs_trial_person_responsible_keyword);
+
+       $form['cs_trial_person_responsible'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $cs_trial_person_responsible_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Person Responsible: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_trial_person_responsible,
+       );
+
+       $form['cs_trial_original_due_date'] = array(
+         '#type' => 'date_popup',
+         '#title' => '',
+         '#date_label_position' => 'none', //'above' the date part, 'within' it, or 'none', default is 'above'
+         '#date_format' => 'm/d/Y',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Original Due Date: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' =>  $cs_trial_original_due_date,
+       );
+
+       $form['cs_trial_revised_due_date'] = array(
+         '#type' => 'date_popup',
+         '#title' => '',
+         '#date_label_position' => 'none', //'above' the date part, 'within' it, or 'none', default is 'above'
+         '#date_format' => 'm/d/Y',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Revised Due Date: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_trial_revised_due_date,
+       );
+
+       $form['cs_trial_next_steps'] = array(
+         '#type' => 'textarea',
+         '#maxlength' => 500,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Next Steps: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $cs_trial_next_steps,
+       );
+
+       $form['end_cs_trial_section'] = array(
+         '#markup' => '</div>'
+       );
+
+       $form['end_cost_savings_section'] = array(
+         '#markup' => '</div>',
+       );
+
+       //************CONCERN/INCIDENT FIELDS***************
+       $form['start_concern_incident_section'] = array(
+         '#markup' => '<div id="sac_concern_incident_section">'
+       );
+
+       //get the provisional supplier status based on supplier number
+       //if its an existing doc we need to ignore this on the first run so it uses the
+       //data pulled at the top
+       if ($form_state['run_once'] != "Yes")
+       {
+       //then dont do a thing
+       }
+       else
+       {
+           $ci_provisional_supplier = get_provisional_status_from_maintenance_table($sac_supplier_number);
+       }
+
+       $form_state['storage']['ci_provisional_supplier_value'] = $ci_provisional_supplier;
+
+       $form['ci_provisional_supplier'] = array(
+         '#markup' => '<div class="sac_row"><div class="sac_column_1_text">Provisional Supplier: </div><div class="sac_column_2">'. $ci_provisional_supplier .'</div></div>',
+       	 '#prefix' => '<div id="ci_provisional_supplier">',
+         '#suffix' => '</div>',
+       );
+
+       $form['ci_problem_description'] = array(
+         '#type' => 'textarea',
+         '#maxlength' => 500,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Problem Description: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_problem_description,
+       );
+
+      $ci_root_cause_keyword = "ci_root_cause";
+      $ci_root_cause_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($ci_root_cause_keyword);
+
+      $form['ci_root_cause'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $ci_root_cause_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Root Cause: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_root_cause,
+       );
+
+      $ci_person_responsible_keyword = "ci_person_responsible";
+      $ci_person_responsible_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($ci_person_responsible_keyword);
+
+      $form['ci_person_responsible'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $ci_person_responsible_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Person Responsible: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_person_responsible,
+       );
+
+      $ci_urgency_of_response_keyword = "ci_urgency_of_response";
+      $ci_urgency_of_response_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($ci_urgency_of_response_keyword);
+
+      $form['ci_urgency_of_response'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $ci_urgency_of_response_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Urgency of Response: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_urgency_of_response,
+       );
+
+       $form['ci_due_date'] = array(
+         '#type' => 'date_popup',
+         '#title' => '',
+         '#date_label_position' => 'none', //'above' the date part, 'within' it, or 'none', default is 'above'
+         '#date_format' => 'm/d/Y',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1_date">Due Date: </div><div class="sac_column_2_date">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_due_date,
+       );
+
+      $ci_corrective_action_keyword = "ci_corrective_action";
+      $ci_corrective_action_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($ci_corrective_action_keyword);
+
+      $form['ci_corrective_action'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $ci_corrective_action_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Corrective Action: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_corrective_action,
+       );
+
+       $form['ci_outcome_comments'] = array(
+         '#type' => 'textarea',
+         '#maxlength' => 500,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Outcome Comments: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_outcome_comments,
+       );
+
+       $form['ci_follow_up_date'] = array(
+         '#type' => 'date_popup',
+         '#title' => '',
+         '#date_label_position' => 'none', //'above' the date part, 'within' it, or 'none', default is 'above'
+         '#date_format' => 'm/d/Y',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Follow-up Date: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_follow_up_date,
+       );
+
+       //The following two sections are not working with the 'sac_mill' javascript attributes
+       //because there is ajax on it and my assumption is they are scrapping over the onchange event.
+       //So this is making a decision and using ajax to refresh the section with the result of that decision.
+
+       //Only show if mill_x is selected
+//       if ($sac_mill == "mill_x")
+//       {
+           $form['ci_create_sdr'] = array(
+             '#type' => 'checkbox',
+             '#title' => '',
+             '#required' => FALSE,
+             '#prefix' => '<div id="sdr_checkbox_section"><div class="sac_row"><div class="sac_column_1">SDR/NCR: </div><div class="sac_column_2">',
+             '#suffix' => '</div></div></div>',
+             '#default_value' => $ci_create_sdr,
+             '#attributes' => array(
+                 'id' => 'ci_create_sdr',
+                 'onchange' => 'ci_create_sdr_display(this.selectedIndex)'
+              )
+           );
+//       }
+//       else
+//       {
+//           $form['ci_create_sdr'] = array(
+//               '#markup' => '<div id="sdr_checkbox_section"></div>'
+//           );
+//       }
+
+       //Only show if mill_y is selected
+//       if ($sac_mill == "mill_y")
+//       {
+            $form['ci_create_rcfa'] = array(
+                '#type' => 'checkbox',
+                '#title' => '',
+                '#required' => FALSE,
+                '#prefix' => '<div id="rcfa_checkbox_section"><div class="sac_row"><div class="sac_column_1">RCFA & CA: </div><div class="sac_column_2">',
+                '#suffix' => '</div></div></div>',
+                '#default_value' => $ci_create_rcfa,
+                '#attributes' => array(
+                    'id' => 'ci_create_rcfa',
+                    'onchange' => 'ci_create_rcfa_display(this.selectedIndex)'
+                )
+            );
+//       }
+//       else
+//       {
+//           $form['ci_create_rcfa'] = array(
+//               '#markup' => '<div id="rcfa_checkbox_section"></div>'
+//           );
+//       }
+
+       //SDR-NCR fields
+
+       $form['start_ci_sdr_section'] = array(
+         '#markup' => '<div id="ci_sdr_section">'
+       );
+
+       $form['fs_ci_sdr_pd'] = array(
+         '#type' => 'fieldset',
+         '#title' => t('Procurement Department'),
+       );
+
+       $form['fs_ci_sdr_pd']['ci_sdr_pd_sap_po_number'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">SAP PO Number: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_sdr_pd_sap_po_number,
+       );
+
+       $form['fs_ci_sdr_pd']['ci_sdr_pd_name_of_discrepant_material'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Name of Discrepant Material: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_sdr_pd_name_of_discrepant_material,
+       );
+
+       $form['fs_ci_sdr_pd']['ci_sdr_pd_date_received'] = array(
+         '#type' => 'date_popup',
+         '#title' => '',
+         '#date_label_position' => 'none', //'above' the date part, 'within' it, or 'none', default is 'above'
+         '#date_format' => 'm/d/Y',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Date Received: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_sdr_pd_date_received,
+       );
+
+       $form['fs_ci_sdr_pd']['ci_sdr_pd_lot_number'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Lot Number: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_sdr_pd_lot_number,
+       );
+
+       $ci_sdr_pd_nonconformance_description_keyword = "ci_sdr_pd_nonconformance_description";
+       $ci_sdr_pd_nonconformance_description_options = get_keywords_from_keywords_table($ci_sdr_pd_nonconformance_description_keyword);
+
+       $form['fs_ci_sdr_pd']['ci_sdr_pd_nonconformance_description'] = array(
+         '#type' => 'checkboxes',
+         '#options' => $ci_sdr_pd_nonconformance_description_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Non-Conformance Description: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_sdr_pd_nonconformance_description,
+       );
+
+       $form['fs_ci_sdr_pd']['ci_sdr_pd_nonconformance_detail'] = array(
+         '#type' => 'textarea',
+         '#maxlength' => 500,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Non-Conformance Detail: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_sdr_pd_nonconformance_detail,
+       );
+
+       $form['fs_ci_sdr_pd']['ci_sdr_pd_sent_to_stakeholder'] = array(
+         '#type' => 'checkbox',
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Sent to Stakeholder: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_sdr_pd_sent_to_stakeholder,
+         '#attributes' => array(
+             'id' => 'ci_sdr_pd_sent_to_stakeholder',
+         )
+       );
+
+       $form['fs_ci_sdr_pd']['ci_sdr_pd_approved_by_stakeholder'] = array(
+         '#type' => 'checkbox',
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Approved By Stakeholder: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_sdr_pd_approved_by_stakeholder,
+         '#attributes' => array(
+             'id' => 'ci_sdr_pd_approved_by_stakeholder',
+         )
+       );
+
+       $form['fs_ci_sdr_qa'] = array(
+         '#type' => 'fieldset',
+         '#title' => t('QA Engineer'),
+       );
+
+       $form['fs_ci_sdr_qa']['ci_sdr_qa_sdr_number'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">SDR Number: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_sdr_qa_sdr_number,
+       );
+
+       $form['fs_ci_sdr_qa']['ci_sdr_qa_date_received'] = array(
+         '#type' => 'date_popup',
+         '#title' => '',
+         '#date_label_position' => 'none', //'above' the date part, 'within' it, or 'none', default is 'above'
+         '#date_format' => 'm/d/Y',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Date Received: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_sdr_qa_date_received,
+       );
+
+       $ci_sdr_qa_final_disposition_keyword = "ci_sdr_qa_final_disposition";
+       $ci_sdr_qa_final_disposition_options = get_keywords_from_keywords_table($ci_sdr_qa_final_disposition_keyword);
+
+       $form['fs_ci_sdr_qa']['ci_sdr_qa_final_disposition'] = array(
+         '#type' => 'checkboxes',
+         '#options' => $ci_sdr_qa_final_disposition_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Final Disposition: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_sdr_qa_final_disposition,
+       );
+
+       $form['fs_ci_sdr_qa']['ci_sdr_qa_raw_material_nonconformance_notice'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Raw material Non-Conformance Notice: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_sdr_qa_raw_material_nonconformance_notice,
+       );
+
+       $form['fs_ci_sdr_qa']['ci_sdr_qa_quality_engineer'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Quality Engineer: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_sdr_qa_quality_engineer,
+       );
+
+       $form['end_sdr_section'] = array(
+         '#markup' => '</div>'
+       );
+
+       //RCFA & CA fields
+       $form['start_ci_rcfa_section'] = array(
+         '#markup' => '<div id="ci_rcfa_section">'
+       );
+
+       $form['ci_rcfa_glt_purchasing_contract'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">GLT Purchasing Contact: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_rcfa_glt_purchasing_contract,
+       );
+
+       $form['ci_rcfa_date_submitted'] = array(
+         '#type' => 'date_popup',
+         '#title' => '',
+         '#date_label_position' => 'none', //'above' the date part, 'within' it, or 'none', default is 'above'
+         '#date_format' => 'm/d/Y',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Date Submitted: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_rcfa_date_submitted,
+       );
+
+       $form['ci_rcfa_approved_by_stakeholder'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Approved By Stakeholder: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_rcfa_approved_by_stakeholder,
+       );
+
+       $form['ci_rcfa_supplier_contact'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Supplier Contact: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_rcfa_supplier_contact,
+       );
+
+       $form['ci_rcfa_response_due'] = array(
+         '#type' => 'date_popup',
+         '#title' => '',
+         '#date_label_position' => 'none', //'above' the date part, 'within' it, or 'none', default is 'above'
+         '#date_format' => 'm/d/Y',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Response Due: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_rcfa_response_due,
+       );
+
+       $form['ci_rcfa_response_date'] = array(
+         '#type' => 'date_popup',
+         '#title' => '',
+         '#date_label_position' => 'none', //'above' the date part, 'within' it, or 'none', default is 'above'
+         '#date_format' => 'm/d/Y',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Response Date: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_rcfa_response_date,
+       );
+
+       $form['ci_rcfa_submitted_by'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Submitted By: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_rcfa_submitted_by,
+       );
+
+       $form['ci_rcfa_supplier_details'] = array(
+         '#type' => 'textarea',
+         '#maxlength' => 500,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">RCFA & CA Details: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_rcfa_supplier_details,
+       );
+
+       $form['ci_rcfa_sent_to_stakeholder'] = array(
+         '#type' => 'checkbox',
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Sent to Stakeholder: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_rcfa_sent_to_stakeholder,
+       );
+
+       $form['ci_rcfa_approved_by_stakeholder'] = array(
+         '#type' => 'checkbox',
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Approved By Stakeholder: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_rcfa_approved_by_stakeholder,
+       );
+
+// This didnt work because I lack the skillz so I had to do separate check boxes
+//       $form['ci_rcfa_or_ca'] = array(
+//         '#type' => 'checkboxes',
+//         '#options' => drupal_map_assoc(array(t('RCFA'), t('CA'))),
+//         '#required' => FALSE,
+//	 '#prefix' => '<div class="sac_row"><div class="sac_column_1">RCFA or CA: </div><div class="sac_column_2">',
+//  	 '#suffix' => '</div></div>',
+//	 '#default_value' => '',
+//         '#attributes' => array(
+//             'id' => 'ci_rcfa_or_ca',
+//             'onchange' => 'ci_rcfa_course_of_action_display(this.selectedIndex)'
+//         )
+//       );
+
+       $form['ci_rcfa'] = array(
+         '#type' => 'checkbox',
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">RCFA: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_rcfa,
+         '#attributes' => array(
+             'id' => 'ci_rcfa',
+             'onchange' => 'ci_rcfa_course_of_action_display(this.selectedIndex)'
+         )
+       );
+
+       $form['ci_ca'] = array(
+         '#type' => 'checkbox',
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">CA: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_ca,
+         '#attributes' => array(
+             'id' => 'ci_ca',
+             'onchange' => 'ci_rcfa_course_of_action_display(this.selectedIndex)'
+         )
+       );
+
+      //If RCFA or CA was selected above, show these fields
+      $form['start_ci_rcfa_course_of_action_section'] = array(
+         '#markup' => '<div id="ci_rcfa_course_of_action_section">'
+      );
+
+      $ci_rcfa_course_of_action_keyword = "ci_rcfa_course_of_action";
+      $ci_rcfa_course_of_action_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($ci_rcfa_course_of_action_keyword);
+
+      $form['ci_rcfa_course_of_action'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $ci_rcfa_course_of_action_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Course of Action: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $ci_rcfa_course_of_action,
+       );
+
+       $form['end_ci_rcfa_course_of_action_section'] = array(
+         '#markup' => '</div>'
+       );
+
+       $form['end_ci_rcfa_section'] = array(
+         '#markup' => '</div>'
+       );
+
+       $form['end_concern_incident_section'] = array(
+         '#markup' => '</div>'
+       );
+
+       //************TRIAL FIELDS*********************
+       $form['start_trial_section'] = array(
+         '#markup' => '<div id="sac_trial_section">'
+       );
+
+       $trial_entry_type_keyword = "trial_entry_type";
+       $trial_entry_type_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($trial_entry_type_keyword);
+
+       $form['trial_entry_type'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $trial_entry_type_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Trial Type: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $trial_entry_type,
+         '#attributes' => array(
+             'id' => 'trial_entry_type',
+             'onchange' => 'trial_entry_type_display(this.selectedIndex)'
+          )
+       );
+
+       //New product trial fields
+       $form['start_trial_new_product_section'] = array(
+         '#markup' => '<div id="trial_new_product_section">'
+       );
+
+       $form['trial_new_material_supplier'] = array(
+         '#type' => 'textfield',
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Trial Material Supplier: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $trial_new_material_supplier,
+       );
+
+       $form['trial_new_material_description'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1_text">Trial Material Description: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $trial_new_material_description,
+       );
+
+       $form['trial_new_start_date'] = array(
+         '#type' => 'date_popup',
+         '#title' => '',
+         '#date_label_position' => 'none', //'above' the date part, 'within' it, or 'none', default is 'above'
+         '#date_format' => 'm/d/Y',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Start Date: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $trial_new_start_date,
+       );
+
+       $form['trial_new_end_date'] = array(
+         '#type' => 'date_popup',
+         '#title' => '',
+         '#date_label_position' => 'none', //'above' the date part, 'within' it, or 'none', default is 'above'
+         '#date_format' => 'm/d/Y',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">End Date: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $trial_new_end_date,
+       );
+
+       $form['trial_new_outcome_comments'] = array(
+         '#type' => 'textarea',
+         '#maxlength' => 500,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Outcome Comments: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $trial_new_outcome_comments,
+       );
+
+       $form['end_trial_new_product_type'] = array(
+         '#markup' => '</div>'
+       );
+
+       //Replacement product trial fields
+       $form['start_trial_replacement_product_section'] = array(
+         '#markup' => '<div id="trial_replacement_product_section">'
+       );
+
+       //get the material numbers based on the supplier number
+       $trial_replace_material_number_options = array('Select'=>'-Select-') + get_material_numbers_from_delivery_table($sac_supplier_number);
+
+       $form['trial_replace_material_number'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $trial_replace_material_number_options,
+         '#required' => FALSE,
+         '#prefix' => '<div id="trial_replace_material_number"><div class="sac_row"><div class="sac_column_1">Material Number: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div></div>',
+         '#default_value' => $trial_replace_material_number,
+         '#ajax' => array(
+            'callback' =>'ajax_material_info_callback', //callback tag
+            'method' => 'replace',
+            'effect' => 'none',
+         ),
+       );
+
+       //get the material description based on the material number
+       if ($form_state['run_once'] != "Yes")
+       {
+       //then dont do a thing
+       }
+       else
+       {
+           $trial_replace_selected_material_number = $form_state['values']['trial_replace_material_number'];
+           $trial_replace_material_description = get_material_description_from_delivery_table($trial_replace_selected_material_number);
+       }
+
+       $form['trial_replace_material_description'] = array(
+         '#markup' => '<div class="sac_row"><div class="sac_column_1_text">Material Description: </div><div class="sac_column_2">'. $trial_replace_material_description .'</div></div>',
+         '#prefix' => '<div id="trial_replace_material_description">',
+         '#suffix' => '</div>',
+       );
+
+       $form['trial_replace_start_date'] = array(
+         '#type' => 'date_popup',
+         '#title' => '',
+         '#date_label_position' => 'none', //'above' the date part, 'within' it, or 'none', default is 'above'
+         '#date_format' => 'm/d/Y',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Start Date: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $trial_replace_start_date,
+       );
+
+       $form['trial_replace_end_date'] = array(
+         '#type' => 'date_popup',
+         '#title' => '',
+         '#date_label_position' => 'none', //'above' the date part, 'within' it, or 'none', default is 'above'
+         '#date_format' => 'm/d/Y',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">End Date: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $trial_replace_end_date,
+       );
+
+       $form['trial_replace_outcome_comments'] = array(
+         '#type' => 'textarea',
+         '#maxlength' => 500,
+         '#maxlength_js' => True,
+         '#size' => 45,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Outcome Comments: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $trial_replace_outcome_comments,
+       );
+
+       $form['end_trial_replacement_product_type'] = array(
+         '#markup' => '</div>'
+       );
+
+       $form['end_sac_trial_section'] = array(
+         '#markup' => '</div>'
+       );
+
+       $sac_status_keyword = "sac_status";
+       $sac_status_options = array('Select'=>'-Select-') + get_keywords_from_keywords_table($sac_status_keyword);
+
+       $form['sac_status'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $sac_status_options,
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_row"><div class="sac_column_1">Status: </div><div class="sac_column_2">',
+         '#suffix' => '</div></div>',
+         '#default_value' => $sac_status,
+       );
+
+//        $form['sac_file_attachments'] = array(
+//            '#type' => 'plupload',
+//            '#title' => t('Upload files'),
+//            '#description' => t('Attach supporting documention for this SAC.'),
+//            '#autoupload' => FALSE,
+//            '#upload_validators' => array(
+//                'file_validate_extensions' => array('jpg jpeg gif png txt doc xls pdf ppt pps odt ods odp'),
+//                'my_custom_file_validator' => array('some validation criteria'),
+//            ),
+//            '#plupload_settings' => array(
+//                'runtimes' => 'html5',
+//                'chunk_size' => '10mb',
+//            ),
+//        );
+
+       $form['close_sac_container'] = array(
+         '#markup' => '</div>'
+       );
+
+       //Its time to send the variable results to javascript
+       $javascript_variables = array(
+          'sac_id' => $sac_id,
+          'mill' => $sac_mill,
+          'sac_entry_type' => $sac_entry_type,
+          'cs_entry_type' => $cs_entry_type,
+          'trial_entry_type' => $trial_entry_type,
+          'ci_create_sdr' => $ci_create_sdr,
+          'ci_create_rcfa' => $ci_create_rcfa,
+          'ci_rcfa' => $ci_rcfa,
+          'ci_ca' => $ci_ca,
+       );
+
+       drupal_add_js(array('supplier_action_communication' => $javascript_variables), 'setting');
+       drupal_add_js(drupal_get_path('module', 'supplier_action_communication') . '/supplier_action_communication.js', 'file');
+
+       $form['submit_button'] = array(
+         '#type' => 'image_button',
+         '#src' => '/images/save3.png',
+         '#prefix' => '<div class="general_bottom_divider"><span id="general_action_icon" class="beautytips grow" title="Save the Supplier Action Communication">',
+         '#suffix' => '</span>',
+         '#name' => 'save',
+       );
+
+       $form['back_to_sac_list'] = array(
+         '#prefix' => '<span id="action_icon" class="beautytips grow" title="Return to the list of Supplier Action Communication Forms">',
+         '#markup' => '<a href="/supplier_action_communication_list/' . $filter_mill . '/' . $filter_supplier . '/' . $filter_type . '/' . $filter_status . '"><img src="/images/go_back_6.png"></a>',
+         '#suffix' => '</span></div>',
+        );
+
+       //This is the only way I can think of to grab the db values one time,
+       //since the form starts at the top down each time. And I'm really tired.
+       $form_state['run_once'] = "Yes";
+
+       //Put values in storage for use in submit
+       $form_state['storage']['filter_mill'] = $filter_mill;
+       $form_state['storage']['filter_supplier'] = $filter_supplier;
+       $form_state['storage']['filter_type'] = $filter_type;
+       $form_state['storage']['filter_status'] = $filter_status;
+
+       return $form;
+    }
+
+//function back_to_sac_list(){
+//    drupal_goto('supplier_action_communication_list');
+//}
+
+
+//****AJAX funtions below*****
+//SAC Form - Changes made when the mill is changed
+function ajax_mill_info_callback($form, $form_state)
+{
+   //since we want to return multiple elements in multiple areas this array works just dandy
+   return array(
+     '#type' => 'ajax',
+     '#commands' => array(
+         ajax_command_replace("#sac_supplier", render($form['sac_supplier'])),
+         //This calls the function to hide info based on mill in the javascript file
+         //Necessary because the onchange and ajax stuff do not get along on the sac_mill field
+         array('command' => 'sac_mill'),
+     )
+   );
+}
+
+//SAC Form - Changes made when the supplier number is changed
+function ajax_supplier_info_callback($form, $form_state)
+{
+   //since we want to return multiple elements in multiple areas this array works just dandy
+   return array(
+     '#type' => 'ajax',
+     '#commands' => array(
+
+      ajax_command_replace("#sac_supplier_number", render($form['sac_supplier_number'])),
+      ajax_command_replace("#cs_material_number", render($form['cs_material_number'])),
+      ajax_command_replace("#ci_provisional_supplier", render($form['ci_provisional_supplier'])),
+      ajax_command_replace("#trial_replace_material_number", render($form['trial_replace_material_number'])),
+
+      )
+   );
+}
+
+//SAC Form - Changes made when the material number is changed
+function ajax_material_info_callback($form, $form_state)
+{
+   //since we want to return multiple elements in multiple areas this array works just dandy
+   return array(
+     '#type' => 'ajax',
+     '#commands' => array(
+
+      ajax_command_replace("#cs_material_description", render($form['cs_material_description'])),
+      ajax_command_replace("#trial_replace_material_description", render($form['trial_replace_material_description'])),
+      )
+   );
+}
+
+function supplier_action_communication_form_submit($form, &$form_state) {
+
+    //If there are files uploaded, go to the function to handle them
+    if (!empty($form_state['values']['sac_file_attachments'])) {
+        $file_attachments = array();
+        $file_attachments = save_files($form_state['values']['sac_file_attachments'], "86", "SAC");
+    }
+
+    //Grab the 'special' form values so we can write them to the database
+    $filter_mill = $form_state['storage']['filter_mill'];
+    $filter_supplier = $form_state['storage']['filter_supplier'];
+    $filter_type = $form_state['storage']['filter_type'];
+    $filter_status = $form_state['storage']['filter_status'];
+
+    $sac_id = $form_state['storage']['sac_id'];
+    $sac_modified_by = $form_state['storage']['sac_modified_by'];
+    $sac_current_date = date("y-m-d h:i:s", time());
+    $sac_recorder = $form_state['storage']['sac_recorder'];
+    $sac_supplier_number = $form_state['storage']['sac_supplier_number_value'];
+    $cs_material_description = $form_state['storage']['cs_material_description_value'];
+    $ci_provisional_supplier = $form_state['storage']['ci_provisional_supplier_value'];
+    $ci_sdr_pd_nonconformance_description = serialize($form_state['values']['ci_sdr_pd_nonconformance_description']);
+    $ci_sdr_qa_final_disposition = serialize($form_state['values']['ci_sdr_qa_final_disposition']);
+    $trial_new_supplier_number = $form_state['storage']['trial_new_supplier_number_value'];
+    $trial_replace_supplier_number = $form_state['storage']['trial_replace_supplier_value'];
+
+    //If its a relationship, get the name from the relationship table and the associated mills
+    $is_this_a_relationship = is_this_a_relationship($sac_supplier_number);
+    if ($is_this_a_relationship == "Yes")
+    {
+        $sac_supplier = get_alias_name_from_relationship_table($sac_supplier_number);
+        $sac_mill = what_mill_is_relationship_associated_with($sac_supplier_number);
+    }
+    else
+    {
+        $sac_supplier = get_supplier_name_from_maintenance_table($sac_supplier_number);
+        $sac_mill = get_mill_from_maintenance_table($sac_supplier_number);
+    }
+
+    //drupal_set_message('<pre>'. print_r($form_state['values'], true) .'</pre>');
+
+    //if $sac_id is not empty update the existing record
+    if(!empty($sac_id))
+    {
+        //Update the values in the company_x_delivery_log table
+        $comments_updated = db_update('company_x_supplier_action_communication')
+        ->fields(array(
+        //Write the basic fields
+        'sac_last_modified_by' => $sac_modified_by,
+        'sac_last_modified_date' => $sac_current_date,
+        'sac_mill' => $sac_mill,
+        'sac_mill_area' => $form_state['values']['sac_mill_area'],
+        'sac_entry_type' => $form_state['values']['sac_entry_type'],
+        'sac_supplier' => $sac_supplier,
+        'sac_supplier_number' => $sac_supplier_number,
+        'sac_status' => $form_state['values']['sac_status'],
+        //'sac_attachments' => $file_attachments[0],
+
+        //Write cost savings fields
+        'cs_entry_type' => $form_state['values']['cs_entry_type'],
+        'cs_material_number' => $form_state['values']['cs_material_number'],
+        'cs_material_description' => $cs_material_description,
+        'cs_ci_type_of_task' => $form_state['values']['cs_ci_type_of_task'],
+        'cs_ci_action_item' => $form_state['values']['cs_ci_action_item'],
+        'cs_ci_impact_potential' => $form_state['values']['cs_ci_impact_potential'],
+        'cs_ci_estimated_cost_impact' => $form_state['values']['cs_ci_estimated_cost_impact'],
+        'cs_ci_form_of_savings' => $form_state['values']['cs_ci_form_of_savings'],
+        'cs_ci_impact' => $form_state['values']['cs_ci_impact'],
+        'cs_ci_ops_lead' => $form_state['values']['cs_ci_ops_lead'],
+        'cs_ci_ci_lead' => $form_state['values']['cs_ci_ci_lead'],
+        'cs_ci_ci_category' => $form_state['values']['cs_ci_ci_category'],
+        'cs_ci_class' => $form_state['values']['cs_ci_class'],
+        'cs_ci_person_responsible' => $form_state['values']['cs_ci_person_responsible'],
+        'cs_ci_original_due_date' => $form_state['values']['cs_ci_original_due_date'],
+        'cs_ci_revised_due_date' => $form_state['values']['cs_ci_revised_due_date'],
+        'cs_ci_next_steps' => $form_state['values']['cs_ci_next_steps'],
+        'cs_process_type_of_task' => $form_state['values']['cs_process_type_of_task'],
+        'cs_process_action_item' => $form_state['values']['cs_process_action_item'],
+        'cs_process_impact_potential' => $form_state['values']['cs_process_impact_potential'],
+        'cs_process_estimated_cost_impact' => $form_state['values']['cs_process_estimated_cost_impact'],
+        'cs_process_form_of_savings' => $form_state['values']['cs_process_form_of_savings'],
+        'cs_process_impact' => $form_state['values']['cs_process_impact'],
+        'cs_process_ops_lead' => $form_state['values']['cs_process_ops_lead'],
+        'cs_process_ci_lead' => $form_state['values']['cs_process_ci_lead'],
+        'cs_process_ci_category' => $form_state['values']['cs_process_ci_category'],
+        'cs_process_class' => $form_state['values']['cs_process_class'],
+        'cs_process_person_responsible' => $form_state['values']['cs_process_person_responsible'],
+        'cs_process_original_due_date' => $form_state['values']['cs_process_original_due_date'],
+        'cs_process_revised_due_date' => $form_state['values']['cs_process_revised_due_date'],
+        'cs_process_next_steps' => $form_state['values']['cs_process_next_steps'],
+        'cs_trial_start_date' => $form_state['values']['cs_trial_start_date'],
+        'cs_trial_end_date' => $form_state['values']['cs_trial_end_date'],
+        'cs_trial_type_of_task' => $form_state['values']['cs_trial_type_of_task'],
+        'cs_trial_action_item' => $form_state['values']['cs_trial_action_item'],
+        'cs_trial_impact_potential' => $form_state['values']['cs_trial_impact_potential'],
+        'cs_trial_estimated_cost_impact' => $form_state['values']['cs_trial_estimated_cost_impact'],
+        'cs_trial_form_of_savings' => $form_state['values']['cs_trial_form_of_savings'],
+        'cs_trial_impact' => $form_state['values']['cs_trial_impact'],
+        'cs_trial_ops_lead' => $form_state['values']['cs_trial_ops_lead'],
+        'cs_trial_ci_lead' => $form_state['values']['cs_trial_ci_lead'],
+        'cs_trial_ci_category' => $form_state['values']['cs_trial_ci_category'],
+        'cs_trial_class' => $form_state['values']['cs_trial_class'],
+        'cs_trial_person_responsible' => $form_state['values']['cs_trial_person_responsible'],
+        'cs_trial_original_due_date' => $form_state['values']['cs_trial_original_due_date'],
+        'cs_trial_revised_due_date' => $form_state['values']['cs_trial_revised_due_date'],
+        'cs_trial_next_steps' => $form_state['values']['cs_trial_next_steps'],
+
+        //Write concern/incident fields
+        'ci_provisional_supplier' => $ci_provisional_supplier,
+        'ci_problem_description' => $form_state['values']['ci_problem_description'],
+        'ci_root_cause' => $form_state['values']['ci_root_cause'],
+        'ci_person_responsible' => $form_state['values']['ci_person_responsible'],
+        'ci_urgency_of_response' => $form_state['values']['ci_urgency_of_response'],
+        'ci_due_date' => $form_state['values']['ci_due_date'],
+        'ci_corrective_action' => $form_state['values']['ci_corrective_action'],
+        'ci_outcome_comments' => $form_state['values']['ci_outcome_comments'],
+        'ci_follow_up_date' => $form_state['values']['ci_follow_up_date'],
+        'ci_create_sdr' => $form_state['values']['ci_create_sdr'],
+        'ci_create_rcfa' => $form_state['values']['ci_create_rcfa'],
+        'ci_sdr_pd_sap_po_number' => $form_state['values']['ci_sdr_pd_sap_po_number'],
+        'ci_sdr_pd_name_of_discrepant_material' => $form_state['values']['ci_sdr_pd_name_of_discrepant_material'],
+        'ci_sdr_pd_date_received' => $form_state['values']['ci_sdr_pd_date_received'],
+        'ci_sdr_pd_lot_number' => $form_state['values']['ci_sdr_pd_lot_number'],
+        'ci_sdr_pd_nonconformance_description' => $ci_sdr_pd_nonconformance_description,
+        'ci_sdr_pd_nonconformance_detail' => $form_state['values']['ci_sdr_pd_nonconformance_detail'],
+        'ci_sdr_pd_sent_to_stakeholder' => $form_state['values']['ci_sdr_pd_sent_to_stakeholder'],
+        'ci_sdr_pd_approved_by_stakeholder' => $form_state['values']['ci_sdr_pd_approved_by_stakeholder'],
+        'ci_sdr_qa_sdr_number' => $form_state['values']['ci_sdr_qa_sdr_number'],
+        'ci_sdr_qa_date_received' => $form_state['values']['ci_sdr_qa_date_received'],
+        'ci_sdr_qa_final_disposition' => $ci_sdr_qa_final_disposition,
+        'ci_sdr_qa_raw_material_nonconformance_notice' => $form_state['values']['ci_sdr_qa_raw_material_nonconformance_notice'],
+        'ci_sdr_qa_quality_engineer' => $form_state['values']['ci_sdr_qa_quality_engineer'],
+        'ci_rcfa_glt_purchasing_contract' => $form_state['values']['ci_rcfa_glt_purchasing_contract'],
+        'ci_rcfa_date_submitted' => $form_state['values']['ci_rcfa_date_submitted'],
+        'ci_rcfa_approved_by_stakeholder' => $form_state['values']['ci_rcfa_approved_by_stakeholder'],
+        'ci_rcfa_supplier_contact' => $form_state['values']['ci_rcfa_supplier_contact'],
+        'ci_rcfa_response_due' => $form_state['values']['ci_rcfa_response_due'],
+        'ci_rcfa_response_date' => $form_state['values']['ci_rcfa_response_date'],
+        'ci_rcfa_submitted_by' => $form_state['values']['ci_rcfa_submitted_by'],
+        'ci_rcfa_supplier_details' => $form_state['values']['ci_rcfa_supplier_details'],
+        'ci_rcfa_sent_to_stakeholder' => $form_state['values']['ci_rcfa_sent_to_stakeholder'],
+        'ci_rcfa_approved_by_stakeholder' => $form_state['values']['ci_rcfa_approved_by_stakeholder'],
+        'ci_rcfa' => $form_state['values']['ci_rcfa'],
+        'ci_ca' => $form_state['values']['ci_ca'],
+        'ci_rcfa_course_of_action' => $form_state['values']['ci_rcfa_course_of_action'],
+
+        //Write trial fields
+        'trial_entry_type' => $form_state['values']['trial_entry_type'],
+        'trial_new_material_supplier' => $form_state['values']['trial_new_material_supplier'],
+        'trial_new_material_description' => $form_state['values']['trial_new_material_description'],
+        'trial_new_start_date' => $form_state['values']['trial_new_start_date'],
+        'trial_new_end_date' => $form_state['values']['trial_new_end_date'],
+        'trial_new_outcome_comments' => $form_state['values']['trial_new_outcome_comments'],
+        'trial_replace_material_number' => $form_state['values']['trial_replace_material_number'],
+        'trial_replace_material_description' => $form_state['values']['trial_replace_material_description'],
+        'trial_replace_start_date' => $form_state['values']['trial_replace_start_date'],
+        'trial_replace_end_date' => $form_state['values']['trial_replace_end_date'],
+        'trial_replace_outcome_comments' => $form_state['values']['trial_replace_outcome_comments'],
+
+          ))
+        ->condition('id', $sac_id, '=')
+        ->execute();
+
+        $id = $sac_id;
+    }//End updating existing record
+
+    //If the sac id is empty then write the new record to the database
+    else
+    {
+        $id = db_insert('company_x_supplier_action_communication')
+        ->fields(array(
+
+        //Write the basic fields
+        'sac_recorder' => $sac_recorder,
+        'sac_create_date' => $sac_current_date,
+        'sac_mill' => $sac_mill,
+        'sac_mill_area' => $form_state['values']['sac_mill_area'],
+        'sac_entry_type' => $form_state['values']['sac_entry_type'],
+        'sac_supplier' => $sac_supplier,
+        'sac_supplier_number' => $sac_supplier_number,
+        'sac_status' => $form_state['values']['sac_status'],
+//        'sac_attachments' => $file_attachments[0],
+
+        //Write cost savings fields
+        'cs_entry_type' => $form_state['values']['cs_entry_type'],
+        'cs_material_number' => $form_state['values']['cs_material_number'],
+        'cs_material_description' => $cs_material_description,
+        'cs_ci_type_of_task' => $form_state['values']['cs_ci_type_of_task'],
+        'cs_ci_action_item' => $form_state['values']['cs_ci_action_item'],
+        'cs_ci_impact_potential' => $form_state['values']['cs_ci_impact_potential'],
+        'cs_ci_estimated_cost_impact' => $form_state['values']['cs_ci_estimated_cost_impact'],
+        'cs_ci_form_of_savings' => $form_state['values']['cs_ci_form_of_savings'],
+        'cs_ci_impact' => $form_state['values']['cs_ci_impact'],
+        'cs_ci_ops_lead' => $form_state['values']['cs_ci_ops_lead'],
+        'cs_ci_ci_lead' => $form_state['values']['cs_ci_ci_lead'],
+        'cs_ci_ci_category' => $form_state['values']['cs_ci_ci_category'],
+        'cs_ci_class' => $form_state['values']['cs_ci_class'],
+        'cs_ci_person_responsible' => $form_state['values']['cs_ci_person_responsible'],
+        'cs_ci_original_due_date' => $form_state['values']['cs_ci_original_due_date'],
+        'cs_ci_revised_due_date' => $form_state['values']['cs_ci_revised_due_date'],
+        'cs_ci_next_steps' => $form_state['values']['cs_ci_next_steps'],
+        'cs_process_type_of_task' => $form_state['values']['cs_process_type_of_task'],
+        'cs_process_action_item' => $form_state['values']['cs_process_action_item'],
+        'cs_process_impact_potential' => $form_state['values']['cs_process_impact_potential'],
+        'cs_process_estimated_cost_impact' => $form_state['values']['cs_process_estimated_cost_impact'],
+        'cs_process_form_of_savings' => $form_state['values']['cs_process_form_of_savings'],
+        'cs_process_impact' => $form_state['values']['cs_process_impact'],
+        'cs_process_ops_lead' => $form_state['values']['cs_process_ops_lead'],
+        'cs_process_ci_lead' => $form_state['values']['cs_process_ci_lead'],
+        'cs_process_ci_category' => $form_state['values']['cs_process_ci_category'],
+        'cs_process_class' => $form_state['values']['cs_process_class'],
+        'cs_process_person_responsible' => $form_state['values']['cs_process_person_responsible'],
+        'cs_process_original_due_date' => $form_state['values']['cs_process_original_due_date'],
+        'cs_process_revised_due_date' => $form_state['values']['cs_process_revised_due_date'],
+        'cs_process_next_steps' => $form_state['values']['cs_process_next_steps'],
+        'cs_trial_start_date' => $form_state['values']['cs_trial_start_date'],
+        'cs_trial_end_date' => $form_state['values']['cs_trial_end_date'],
+        'cs_trial_type_of_task' => $form_state['values']['cs_trial_type_of_task'],
+        'cs_trial_action_item' => $form_state['values']['cs_trial_action_item'],
+        'cs_trial_impact_potential' => $form_state['values']['cs_trial_impact_potential'],
+        'cs_trial_estimated_cost_impact' => $form_state['values']['cs_trial_estimated_cost_impact'],
+        'cs_trial_form_of_savings' => $form_state['values']['cs_trial_form_of_savings'],
+        'cs_trial_impact' => $form_state['values']['cs_trial_impact'],
+        'cs_trial_ops_lead' => $form_state['values']['cs_trial_ops_lead'],
+        'cs_trial_ci_lead' => $form_state['values']['cs_trial_ci_lead'],
+        'cs_trial_ci_category' => $form_state['values']['cs_trial_ci_category'],
+        'cs_trial_class' => $form_state['values']['cs_trial_class'],
+        'cs_trial_person_responsible' => $form_state['values']['cs_trial_person_responsible'],
+        'cs_trial_original_due_date' => $form_state['values']['cs_trial_original_due_date'],
+        'cs_trial_revised_due_date' => $form_state['values']['cs_trial_revised_due_date'],
+        'cs_trial_next_steps' => $form_state['values']['cs_trial_next_steps'],
+
+        //Write concern/incident fields
+        'ci_provisional_supplier' => $ci_provisional_supplier,
+        'ci_problem_description' => $form_state['values']['ci_problem_description'],
+        'ci_root_cause' => $form_state['values']['ci_root_cause'],
+        'ci_person_responsible' => $form_state['values']['ci_person_responsible'],
+        'ci_urgency_of_response' => $form_state['values']['ci_urgency_of_response'],
+        'ci_due_date' => $form_state['values']['ci_due_date'],
+        'ci_corrective_action' => $form_state['values']['ci_corrective_action'],
+        'ci_outcome_comments' => $form_state['values']['ci_outcome_comments'],
+        'ci_follow_up_date' => $form_state['values']['ci_follow_up_date'],
+        'ci_create_sdr' => $form_state['values']['ci_create_sdr'],
+        'ci_create_rcfa' => $form_state['values']['ci_create_rcfa'],
+        'ci_sdr_pd_sap_po_number' => $form_state['values']['ci_sdr_pd_sap_po_number'],
+        'ci_sdr_pd_name_of_discrepant_material' => $form_state['values']['ci_sdr_pd_name_of_discrepant_material'],
+        'ci_sdr_pd_date_received' => $form_state['values']['ci_sdr_pd_date_received'],
+        'ci_sdr_pd_lot_number' => $form_state['values']['ci_sdr_pd_lot_number'],
+        'ci_sdr_pd_nonconformance_description' => $ci_sdr_pd_nonconformance_description,
+        'ci_sdr_pd_nonconformance_detail' => $form_state['values']['ci_sdr_pd_nonconformance_detail'],
+        'ci_sdr_pd_sent_to_stakeholder' => $form_state['values']['ci_sdr_pd_sent_to_stakeholder'],
+        'ci_sdr_pd_approved_by_stakeholder' => $form_state['values']['ci_sdr_pd_approved_by_stakeholder'],
+        'ci_sdr_qa_sdr_number' => $form_state['values']['ci_sdr_qa_sdr_number'],
+        'ci_sdr_qa_date_received' => $form_state['values']['ci_sdr_qa_date_received'],
+        'ci_sdr_qa_final_disposition' => $ci_sdr_qa_final_disposition,
+        'ci_sdr_qa_raw_material_nonconformance_notice' => $form_state['values']['ci_sdr_qa_raw_material_nonconformance_notice'],
+        'ci_sdr_qa_quality_engineer' => $form_state['values']['ci_sdr_qa_quality_engineer'],
+        'ci_rcfa_glt_purchasing_contract' => $form_state['values']['ci_rcfa_glt_purchasing_contract'],
+        'ci_rcfa_date_submitted' => $form_state['values']['ci_rcfa_date_submitted'],
+        'ci_rcfa_approved_by_stakeholder' => $form_state['values']['ci_rcfa_approved_by_stakeholder'],
+        'ci_rcfa_supplier_contact' => $form_state['values']['ci_rcfa_supplier_contact'],
+        'ci_rcfa_response_due' => $form_state['values']['ci_rcfa_response_due'],
+        'ci_rcfa_response_date' => $form_state['values']['ci_rcfa_response_date'],
+        'ci_rcfa_submitted_by' => $form_state['values']['ci_rcfa_submitted_by'],
+        'ci_rcfa_supplier_details' => $form_state['values']['ci_rcfa_supplier_details'],
+        'ci_rcfa_sent_to_stakeholder' => $form_state['values']['ci_rcfa_sent_to_stakeholder'],
+        'ci_rcfa_approved_by_stakeholder' => $form_state['values']['ci_rcfa_approved_by_stakeholder'],
+        'ci_rcfa' => $form_state['values']['ci_rcfa'],
+        'ci_ca' => $form_state['values']['ci_ca'],
+        'ci_rcfa_course_of_action' => $form_state['values']['ci_rcfa_course_of_action'],
+
+        //Write trial fields
+        'trial_entry_type' => $form_state['values']['trial_entry_type'],
+        'trial_new_material_supplier' => $form_state['values']['trial_new_material_supplier'],
+        'trial_new_material_description' => $form_state['values']['trial_new_material_description'],
+        'trial_new_start_date' => $form_state['values']['trial_new_start_date'],
+        'trial_new_end_date' => $form_state['values']['trial_new_end_date'],
+        'trial_new_outcome_comments' => $form_state['values']['trial_new_outcome_comments'],
+        'trial_replace_material_number' => $form_state['values']['trial_replace_material_number'],
+        'trial_replace_material_description' => $form_state['values']['trial_replace_material_description'],
+        'trial_replace_start_date' => $form_state['values']['trial_replace_start_date'],
+        'trial_replace_end_date' => $form_state['values']['trial_replace_end_date'],
+        'trial_replace_outcome_comments' => $form_state['values']['trial_replace_outcome_comments'],
+
+        //Save the attachments
+//        'attachments' => $form_state['values']['sac_file_attachments'],
+        ))
+
+    ->execute();
+    }//End writing new record to database
+
+     //show completed form
+     drupal_goto('supplier_action_communication_form/'. $id . '/Yes/' . $filter_mill . '/' . $filter_supplier . '/' . $filter_type . '/' . $filter_status);
+
+    //Display message after user submits form
+//    $message = "The " . $form_state['values']['sac_entry_type'] . ' Supplier Action Communication for ' . $sac_supplier . ' has been successfully saved.';
+//    drupal_set_message($message, $type = 'status', $repeat = TRUE); // status, warning, error are types
+}
+
+//**********************************************************************************************************
+//*****                                                                                                *****
+//*****                                    SAC LIST STUFF                                              *****
+//*****                                                                                                *****
+//**********************************************************************************************************
+
+function supplier_action_communication_list_form ($form, &$form_state, $filter_mill, $filter_supplier, $filter_type, $filter_status) {
+
+    //Filters! Filters! Filters!
+
+    //Probably a better way to grab the mills (joint query maybe) but Im going to start with hardcoding them
+    $sac_list_mill_options = array('All'=>'All') + array('1001'=>'mill_x') + array('1550'=>'mill_y');
+
+    //If it is the first pass, then grab the user mill from their profile and use it as the default
+    if($form_state['run_once'] != "Yes")
+    {
+        if (empty($filter_mill))
+        {
+            //use the user default if a mill has not been passed in
+             $sac_list_mill = get_user_mill();
+        }
+        else
+        {
+            //if one has been passed in then use it.
+            $sac_list_mill = $filter_mill;
+        }
+
+        //for the first run assign filters passed in to use as the defaults. If none, use All
+        if (empty($filter_supplier))
+        {
+            $sac_list_supplier = 'All';
+        }
+        else
+        {
+            $sac_list_supplier = $filter_supplier;
+        }
+
+        if (empty($filter_type))
+        {
+            $sac_list_entry_type = 'All';
+        }
+        else
+        {
+            //translate the concern/incident type back to normal. It was translated before it was sent because the / jacks up the url parameters
+            if ($filter_type == 'concernincident')
+            {
+                $sac_list_entry_type = "Concern/Incident";
+            }
+            else
+            {
+                $sac_list_entry_type = $filter_type;
+            }
+        }
+        if (empty($filter_status))
+        {
+            $sac_list_status = 'Open';
+        }
+        else
+        {
+            $sac_list_status = $filter_status;
+        }
+    }//end check to see if it has run once
+
+    $form['sac_list_mill'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $sac_list_mill_options,
+     '#required' => FALSE,
+     '#prefix' => '<table id="general_filters_header"><tr><td width="10"><span class="beautytips" title="Select a mill to view only the suppliers associated with that Mill">Mill: </span></td><td width="10">',
+     '#suffix' => '</td><td width="10"><span class="beautytips" title="Suppliers preceded with an Asterisk denote a relationship. Only relationships without suppliers from multiple mills will be shown in the drop down list.">Supplier: </span></td><td width="10">',
+     '#default_value' => $sac_list_mill,
+     '#ajax' => array(
+        'callback' =>'ajax_list_callback', //callback tag
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+    //If it is the first pass, it will use the user profile mill, otherwise get it from the field
+    if($form_state['run_once'] == "Yes")
+    {
+        $sac_list_mill = $form_state['values']['sac_list_mill'];
+    }
+
+    $sac_list_supplier_options = array('All'=>'All') + combined_supplier_and_relationship_list($sac_list_mill,'sac');
+
+    $form['sac_list_supplier'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $sac_list_supplier_options,
+     '#required' => FALSE,
+     '#prefix' => '<div id="sac_list_supplier">',
+     '#suffix' => '</div>',
+     '#default_value' => $sac_list_supplier,
+     '#ajax' => array(
+        'callback' =>'ajax_list_callback', //callback tag
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+     //If it is not the first pass, get the value from the field
+    if($form_state['run_once'] == "Yes")
+    {
+        //use the user selected supplier
+        $sac_list_supplier = $form_state['values']['sac_list_supplier'];
+    }
+
+    $sac_entry_type_keyword = "sac_entry_type";
+    $sac_entry_type_options = array('All'=>'All') + get_keywords_from_keywords_table($sac_entry_type_keyword);
+
+    $form['sac_list_entry_type'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $sac_entry_type_options,
+     '#required' => FALSE,
+     '#prefix' => '</td><td width="10">Type: </td><td width="10">',
+     '#suffix' => '</td>',
+     '#default_value' => $sac_list_entry_type,
+     '#ajax' => array(
+        'callback' =>'ajax_list_callback', //callback tag
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+     //If it is not the first pass, get the value from the field
+    if($form_state['run_once'] == "Yes")
+    {
+        //use the user selected type
+        $sac_list_entry_type = $form_state['values']['sac_list_entry_type'];
+        //Remove the slash in concern/incident type (filter to be passed on if the user goes anywhere) because the / jacks up the url parameters
+        if ($sac_list_entry_type == 'Concern/Incident')
+        {
+            $filter_type = "concernincident";
+        }
+        else
+        {
+            $filter_type = $sac_list_entry_type;
+        }
+    }
+
+    $sac_status_keyword = "sac_status";
+    $sac_status_options = array('All'=>'All') + get_keywords_from_keywords_table($sac_status_keyword);
+
+    $form['sac_list_status'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $sac_status_options,
+     '#required' => FALSE,
+     '#prefix' => '<td width="10">Status: </td><td width="10">',
+     '#suffix' => '</td>',
+     '#default_value' => $sac_list_status,
+     '#ajax' => array(
+        'callback' =>'ajax_list_callback', //callback tag
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+    //If it is not the first pass, get the value from the field
+    if($form_state['run_once'] == "Yes")
+    {
+        //use the user selected status
+        $sac_list_status = $form_state['values']['sac_list_status'];
+    }
+
+    $form['create_new_sac_icon_start'] = array(
+         '#markup' => '<td class="general_filters_add_button"><span class="beautytips grow" title="Create a new Supplier Action Communication Form">',
+    );
+
+    $form['create_new_sac_icon'] = array(
+         '#markup' => '<a id="create_new_sac_icon" href="/supplier_action_communication_form/0/0/' . $sac_list_mill . '/' . $sac_list_supplier . '/' . $filter_type . '/' . $sac_list_status . '"><img src="/images/plus_icon.png"></a>',
+    );
+
+    $form['create_new_sac_icon_end'] = array(
+        '#markup' => '</span></td></tr></table>',
+    );
+
+  //Set the database table and initial SelectQuery options
+  $select = db_select('company_x_supplier_action_communication', 'g_unit');
+  $select ->fields('g_unit', array('id', 'sac_create_date', 'sac_entry_type', 'sac_supplier', 'sac_mill','sac_status','sac_supplier_number'));
+      //Set the conditions based on values collected from filters
+      //Mill
+      if ($sac_list_mill == "" || $sac_list_mill == "All")
+      {
+          //No filter thank you
+      }
+      else
+      {
+          $select->condition('sac_mill', $sac_list_mill);
+      }
+
+      //Entry Type
+      if ($sac_list_entry_type == "Concern/Incident" || $sac_list_entry_type == "Cost Savings" || $sac_list_entry_type == "Trial")
+      {
+        $select->condition('sac_entry_type', $sac_list_entry_type);
+      }
+
+      //Supplier
+      if ($sac_list_supplier == "" || $sac_list_supplier == "All")
+      {
+          //No filter thank you
+      }
+      else
+      {
+          $select->condition('sac_supplier_number', $sac_list_supplier);
+      }
+
+      //Status
+      if ($sac_list_status == "" || $sac_list_status == "All")
+      {
+          //No filter thank you
+      }
+      else
+      {
+          $select->condition('sac_status', $sac_list_status);
+      }
+
+
+    //Execute the query
+    $results = $select->execute();
+
+    //Configure the table rows, making the first column a link to view the details
+    $rows = array();
+    foreach ($results as $row) {
+        $rows[] = array(
+            '<span class="beautytips grow" title="Edit the Supplier Action Communication"><a href="/supplier_action_communication_form/' . $row->id . '/0/' . $sac_list_mill . '/' . $sac_list_supplier . '/' . $filter_type . '/' . $sac_list_status . '">' . '<img src="/images/form_edit.png">' . '</a></span>',
+            $row->sac_supplier,
+            $row->sac_entry_type,
+            $row->sac_status,
+            $row->sac_mill,
+            date_display_mask($row->sac_create_date),
+        );
+    }
+
+    //Table settings. This is using the datatables module which talks to the jQuery plugin, Datatables
+    //We can talk to jQuery's Datatables with straight javascript too, like we did with tabs
+    //but time is short people, and so am I.
+
+    $attributes['datatable_options'] = array(
+      'bFilter'   => TRUE,
+      'bInfo'     => TRUE,
+      'autoWidth' => TRUE,
+      'scrollX' => TRUE,
+      'bStateSave' => TRUE,
+      'aaSorting' => array(
+                        array(5, 'desc'),
+                    ),
+    );
+
+    //Columns headers
+    $header = array(
+      array(
+        'data' => t(''),
+        'datatable_options' => array(
+          'bSortable' => FALSE,
+          'bSearchable' => FALSE,
+        ),
+      ),
+
+      array(
+        'data' => t('Supplier'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+
+      array(
+        'data' => t('Type'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Status'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+
+      array(
+        'data' => t('Purchase Org'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+
+      array(
+        'data' => t('Date Created'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+    );
+
+
+    // Render this mofo
+    $variables = array(
+      'attributes' => $attributes,
+      'header' => $header,
+      'rows' => $rows,
+    );
+
+    $output = theme('datatable', $variables);
+
+    $form['display_list'] = array(
+         '#markup' => $output,
+         '#prefix' => '<div id="display_list">',
+         '#suffix' => '</div>',
+        );
+
+    //Flag when the form has been run one time so we can do all sorts of cool things
+    $form_state['run_once'] = "Yes";
+
+    return $form;
+}//end of the SAC List function
+
+//function create_new_sac(){
+//    drupal_goto('supplier_action_communication_form');
+//}
+
+//AJAX TIME!!!
+//SAC List - Changes made when the filters are changed
+function ajax_list_callback($form, $form_state)
+{
+    //since we want to return multiple elements in multiple areas this array works just dandy
+    return array(
+        '#type' => 'ajax',
+        '#commands' => array(
+            ajax_command_replace("#display_list", render($form['display_list'])),
+            ajax_command_replace("#sac_list_supplier", render($form['sac_list_supplier'])),
+            ajax_command_replace("#create_new_sac_icon", render($form['create_new_sac_icon'])),
+        )
+    );
+}//end of the SAC List AJAX function
+
+//**********************************************************************************************************
+//*****                                                                                                *****
+//*****                SUPPLIER ACTION COMMUNICATION FIELD VALUES MANAGEMENT                           *****
+//*****                                                                                                *****
+//**********************************************************************************************************
+function sac_field_values_management($form, &$form_state, $sac_keyword_name)
+{
+
+    // Make sure Drupal Ajax framework javascript is around
+    drupal_add_library('system', 'drupal.ajax');
+
+    //Overview
+    $form['fs_field_management_overview'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Overview'),
+    );
+
+    $form['fs_field_management_overview']['sac_field_management_overview'] = array(
+        '#markup' => t('Manage Supplier Action Communication "select" field values. Fields that control workflow are not editable and will not be shown in the drop down list.'),
+    );
+
+    $sac_field_category_options = array('All'=>'All') + get_sac_field_categories();
+
+    $form['sac_field_category'] = array(
+        '#type' => 'select',
+        '#options' => $sac_field_category_options,
+        '#required' => FALSE,
+        '#prefix' => '<div class="sac_maintenance_header"><div class="sac_maintenance_header_row"><div class="sac_maintenance_header_column_1"><span class="beautytips" title="Select a category to narrow down the field choices">Category: </span></div><div class="sac_maintenance_header_column_2">',
+        '#suffix' => '</div><div class="sac_maintenance_header_column_3"><span class="beautytips" title="Select a subcategory to narrow down the field choices.">Subcategory: </span></div><div class="sac_maintenance_header_column_4"',
+        '#default_value' => 'All',
+        '#ajax' => array(
+            'callback' =>'ajax_field_maintenance_callback',
+            'effect' => 'none',
+            'progress' => array(
+                'type' => 'throbber',
+                'message' => NULL
+            ),
+        ),
+    );
+
+    //Since it doesnt grab the default value on the first pass, assign it
+    if ($form_state['run_once'] == "Yes")
+    {
+        $sac_field_category = $form_state['values']['sac_field_category'];
+    }
+    else
+    {
+        $sac_field_category = 'All';
+    }
+
+    $sac_field_subcategory_options = array('All'=>'All') + get_sac_field_subcategories($sac_field_category);
+
+    $form['sac_field_subcategory'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $sac_field_subcategory_options,
+     '#required' => FALSE,
+     '#prefix' => '<div id="sac_field_subcategory">',
+     '#suffix' => '</div>',
+     '#default_value' => 'All',
+     '#ajax' => array(
+        'callback' =>'ajax_field_maintenance_callback', //callback tag
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+    //Since it doesnt grab the default value on the first pass, assign it
+    if ($form_state['run_once'] == "Yes")
+    {
+        $sac_field_subcategory = $form_state['values']['sac_field_subcategory'];
+    }
+    else
+    {
+        $sac_field_subcategory = 'All';
+    }
+
+    $form['sac_field_name_start'] = array(
+        '#markup' => '<div class="sac_maintenance_header_column_5"><span class="beautytips" title="Fields that control workflow are not editable and will not be shown in the drop down list.">Field: </span></div><div class="sac_maintenance_header_column_6">',
+    );
+
+    $sac_field_options = array('-Select-'=>'-Select-') + get_sac_field_options($sac_field_category, $sac_field_subcategory);
+
+    $form['sac_field_name'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $sac_field_options,
+     '#required' => FALSE,
+     '#prefix' => '<div id="sac_field_name">',
+     '#suffix' => '</div>',
+     '#default_value' => '',
+     '#ajax' => array(
+        'callback' =>'ajax_field_maintenance_callback', //callback tag
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+    $form['sac_field_name_end'] = array(
+        '#markup' => '</div></div></div>',
+    );
+
+    //Since it doesnt grab the default value on the first pass, assign it
+    if ($form_state['run_once'] == "Yes")
+    {
+        $field_name = $form_state['values']['sac_field_name'];
+    }
+    else
+    {
+        $field_name = '-Select-';
+    }
+
+    $header = array('', '');
+
+    //Set the database table and criteria
+    $query = db_select('company_x_sac_keywords', 'g')
+        ->fields('g', array('id','sac_keyword_name','sac_keyword_value'))
+        ->condition('sac_keyword_name', $field_name)
+        ->orderBy('g.sac_keyword_value');
+    $result = $query->execute();
+
+    # build the table data
+    $rows = array();
+    //load the data in the $rows array
+    foreach ($result as $row)
+    {
+        $rows[] = array(
+            'data' => array(
+                // Column 1
+                'icons'   => array(
+//                'data'  => '<span class="beautytips grow" title="Remove the keyword"><a href="/sac_delete_field_value/nojs/' . $row->id . '/'.$field_name.'" class="use-ajax">' . '<img src="../../../../images/trash_delete_16x16.png">' . '</a></span>',
+                'data'  => '<span><a href="/sac_delete_field_value/nojs/' . $row->id . '/'.$field_name.'" class="use-ajax">' . '<img src="/images/trash_delete_16x16.png">' . '</a></span>',
+                'class' => 'sac_field_maintenance_icon_column',
+                ),
+                // Column 2
+                'value' => array(
+                'data'  => $row->sac_keyword_value,
+                'class' => 'sac_field_maintenance_value_column',
+                ),
+            ),
+            // Row attributes
+            'id'    => array('field_value_row_' . $row->id),
+            'class' => array('field_value_row'),
+        );
+    }//end of foreach to cycle through rows of field values
+
+    $output = theme('table', array(
+        'header' => $header,
+        'rows' => $rows,
+        'attributes'=> array (
+            'id' => array('sac_field_values'),
+            'class' => array('sac_field_maintenance_table'),
+        )
+    ));
+
+    $output = theme('table', array(
+        'header' => $header,
+        'rows' => $rows,
+        'attributes'=> array (
+            'id' => array('sac_field_values'),
+            'class' => array('sac_field_maintenance_table'),
+        ))
+    );
+
+    //display the suppliers in the relationship in a table
+    $form['display_field_values'] = array(
+        '#type' => 'markup',
+        '#markup' => $output,
+        '#prefix' => '<div id="display_field_values">',
+        '#suffix' => '</div>',
+    );
+
+    //Its time to send the variable results to javascript so we can hide the add field section if needed
+    $javascript_variables = array(
+        'field_name' => $field_name,
+    );
+
+    drupal_add_js(array('supplier_action_communication' => $javascript_variables), 'setting');
+    drupal_add_js(drupal_get_path('module', 'supplier_action_communication') . '/sac_field_maintenance.js', 'file');
+
+    $form['sac_add_new_value_section'] = array(
+        '#markup' => '<div id="sac_add_new_value_section">',
+    );
+
+    $form['new_field_value'] = array(
+         '#type' => 'textfield',
+         '#maxlength' => 40,
+         '#size' => 40,
+         '#title' => '',
+         '#required' => FALSE,
+         '#prefix' => '<div class="sac_maintenance_container"><div class="sac_maintenance_row"><div class="sac_maintenance_column_1">Add new value: </div><div class="sac_sac_maintenance_column_2">',
+         '#suffix' => '</div>',
+         '#default_value' => '',
+         '#attributes' => array(
+            'placeholder' => t('Enter value and press enter'),
+         ),
+         '#ajax' => array(
+            'callback' => 'ajax_update_add_value_link_callback',
+            'event' => 'change',
+            'keypress' => TRUE,
+            'effect' => 'none',
+            'progress' => array(
+                'type' => 'none',
+                'message' => NULL
+            ),
+         ),
+    );
+
+    $new_field_value = $form_state['values']['new_field_value'];
+
+    $form['sac_add_new_value_button'] = array(
+        '#markup' => '<div id="sac_add_new_value_button" class="sac_maintenance_column_3"><span><a href="/sac_add_field_value/nojs/' . $field_name . '/'.$new_field_value.'" id="new_value_link" class="use-ajax">' . '<img src="/images/plus_icon.png">' . '</a></span></div></div></div></div>',
+    );
+
+    //Flag when the form has been run one time so we can do all sorts of cool things
+    $form_state['run_once'] = "Yes";
+
+    return $form;
+}//end of the sac_field_values_management function
+
+//AJAX TIME!!!
+//Field Maintenance - Refresh field values when a field is selected
+function ajax_field_maintenance_callback($form, $form_state)
+{
+    //Create some ajax commands and return them
+    return array(
+        '#type' => 'ajax',
+        '#commands' => array(
+            ajax_command_replace("#display_field_values", render($form['display_field_values'])),
+            ajax_command_replace("#sac_add_new_field_button", render($form['sac_add_new_field_button'])),
+            ajax_command_replace("#sac_field_subcategory", render($form['sac_field_subcategory'])),
+            ajax_command_replace("#sac_field_name", render($form['sac_field_name'])),
+            //This calls the function to hide the new value field
+            //Necessary because the onchange and ajax stuff do not get along on the category field
+            array('command' => 'sac_new_value_field'),
+            //ajax_command_replace("#new_field_value", render($form['new_field_value'])),
+        )
+    );
+}//end of the field maintenance ajax function
+
+//This function is called from the link generated (trash can) in the field maintenance function
+function sac_delete_field_value($ajax, $value_id, $field_name)
+{
+    $is_ajax = $ajax === 'ajax';
+
+    //Delete the record
+    $delete_record = db_delete('company_x_sac_keywords')
+        ->condition('id', $value_id,'=' )
+        ->execute();
+
+    //Rebuild the list of field values for display. I was using ajax_command_remove to remove only the row
+    //that had been deleted and that worked great. However since its striped, it would mash two whites
+    //or two grays together. I didn't like that so I decided to replace the whole thing.
+    $header = array('', '');
+
+    //Set the database table and criteria
+    $query = db_select('company_x_sac_keywords', 'g')
+        ->fields('g', array('id','sac_keyword_name','sac_keyword_value'))
+        ->condition('sac_keyword_name', $field_name)
+        ->orderBy('g.sac_keyword_value');
+    $result = $query->execute();
+
+    # build the table data
+    $rows = array();
+    //load the data in the $rows array
+    foreach ($result as $row)
+    {
+        $rows[] = array(
+            'data' => array(
+                // Column 1
+                'icons'   => array(
+//                'data'  => '<span class="beautytips grow" title="Remove the keyword"><a href="/sac_delete_field_value/nojs/' . $row->id . '/'.$field_name.'" class="use-ajax">' . '<img src="../../../../images/trash_delete_16x16.png">' . '</a></span>',
+                'data'  => '<span><a href="/sac_delete_field_value/nojs/' . $row->id . '/'.$field_name.'" class="use-ajax">' . '<img src="/images/trash_delete_16x16.png">' . '</a></span>',
+                'class' => 'sac_field_maintenance_icon_column',
+                ),
+                // Column 2
+                'value' => array(
+                'data'  => $row->sac_keyword_value,
+                'class' => 'sac_field_maintenance_value_column',
+                ),
+            ),
+            // Row attributes
+            'id'    => array('field_value_row_' . $row->id),
+            'class' => array('field_value_row'),
+        );
+    }//end of foreach to cycle through rows of field values
+
+    $output = theme('table', array(
+        'header' => $header,
+        'rows' => $rows,
+        'attributes'=> array (
+            'id' => array('sac_field_values'),
+            'class' => array('sac_field_maintenance_table'),
+        )
+    ));
+
+    $output = '<div id="display_field_values">'.$output.'</div>';
+
+    //check to see if its using ajax and if so replace the old stuff with the new stuff
+    //If not, then set a message that it has been deleted and go somewhere.  I really don't
+    //know where or care where because ajax should be enabled.  But at least it won't blow up
+    //if it is not
+    if ($is_ajax)
+    {
+
+    //Create some ajax commands and return them
+    $commands = array();
+    $commands[] = ajax_command_replace("#display_field_values", $output);
+
+    return array(
+      '#type' => 'ajax',
+      '#commands' => $commands,
+    );
+  }
+  else {
+    drupal_set_message(t('Deleted the value'));
+    drupal_goto();
+  }
+
+}//end of the sac_delete_field_value delete function
+
+//This function is called from the link generated (plus sign) in the field maintenance function
+function sac_add_field_value($ajax, $field_name, $field_value)
+{
+    $is_ajax = $ajax === 'ajax';
+
+    //add record
+    $add_record = db_insert('company_x_sac_keywords')
+        ->fields(array(
+            //Write the fields
+            'sac_keyword_name' => $field_name,
+            'sac_keyword_value' => $field_value,
+        ))
+
+    ->execute();
+
+    //Rebuild the list of field values for display. I was using ajax_command_remove to remove only the row
+    //that had been deleted and that worked great. However since its striped, it would mash two whites
+    //or two grays together. I didn't like that so I decided to replace the whole thing.
+    $header = array('', '');
+
+    //Set the database table and criteria
+    $query = db_select('company_x_sac_keywords', 'g')
+        ->fields('g', array('id','sac_keyword_name','sac_keyword_value'))
+        ->condition('sac_keyword_name', $field_name)
+        ->orderBy('g.sac_keyword_value');
+    $result = $query->execute();
+
+    # build the table data
+    $rows = array();
+    //load the data in the $rows array
+    foreach ($result as $row)
+    {
+        $rows[] = array(
+            'data' => array(
+                // Column 1
+                'icons'   => array(
+//                'data'  => '<span class="beautytips grow" title="Remove the keyword"><a href="/sac_delete_field_value/nojs/' . $row->id . '/'.$field_name.'" class="use-ajax">' . '<img src="../../../../images/trash_delete_16x16.png">' . '</a></span>',
+                'data'  => '<span><a href="/sac_delete_field_value/nojs/' . $row->id . '/'.$field_name.'" class="use-ajax">' . '<img src="/images/trash_delete_16x16.png">' . '</a></span>',
+                'class' => 'sac_field_maintenance_icon_column',
+                ),
+                // Column 2
+                'value' => array(
+                'data'  => $row->sac_keyword_value,
+                'class' => 'sac_field_maintenance_value_column',
+                ),
+            ),
+            // Row attributes
+            'id'    => array('field_value_row_' . $row->id),
+            'class' => array('field_value_row'),
+        );
+    }//end of foreach to cycle through rows of field values
+
+    $output = theme('table', array(
+        'header' => $header,
+        'rows' => $rows,
+        'attributes'=> array (
+            'id' => array('sac_field_values'),
+            'class' => array('sac_field_maintenance_table'),
+        )
+    ));
+
+    $output = '<div id="display_field_values">'.$output.'</div>';
+
+    //check to see if its using ajax and if so replace the old stuff with the new stuff
+    //If not, then set a message that it has been deleted and go somewhere.  I really don't
+    //know where or care where because ajax should be enabled.  But at least it won't blow up
+    //if it is not
+    if ($is_ajax)
+    {
+
+    //Create some ajax commands and return them
+    $commands = array();
+    $commands[] = ajax_command_replace("#display_field_values", $output);
+
+    return array(
+      '#type' => 'ajax',
+      '#commands' => $commands,
+    );
+  }
+  else {
+    drupal_set_message(t('Added the value'));
+    drupal_goto();
+  }
+
+}//end of the sac_delete_field_value delete function
+
+//Updates the add field value link when the field value changes
+function ajax_update_add_value_link_callback($form, $form_state)
+{
+    //Create some ajax commands and return them
+    return array(
+        '#type' => 'ajax',
+        '#commands' => array(
+            ajax_command_replace("#sac_add_new_value_button", render($form['sac_add_new_value_button'])),
+            //This calls the function to hide info based on mill in the javascript file
+            //Necessary because the onchange and ajax stuff do not get along on the sac_mill field
+            array('command' => 'sac_click_new_value_button'),
+
+        )
+    );
+}//end of the field maintenance ajax function
+
+
+//**********************************************************************************************************
+//*****                                                                                                *****
+//*****                                     PERMISSIONS!!                                              *****
+//*****                                                                                                *****
+//**********************************************************************************************************
+
+//This function adds the items to the permissions menu
+function supplier_action_communication_permission() {
+    return array(
+       'QCA Supplier Action Communication Form Access' => array(
+       'title' => t('QCA Supplier Action Communication Form Access'),
+       'description' => t('Allows users to access the Supplier Action Communication form.'),
+       ),
+
+       'QCA Supplier Action Communication List Access' => array(
+       'title' => t('QCA Supplier Action Communication List Access'),
+       'description' => t('Allows users to access the Supplier Action Communication List.'),
+       ),
+
+       'QCA Supplier Action Communication Field Management Access' => array(
+       'title' => t('QCA Supplier Action Communication Field Management Access'),
+       'description' => t('Allows users to manage the Supplier Action Communication Field Values.'),
+       ),
+
+       'QCA Supplier Action Communication Field Value Delete Access' => array(
+       'title' => t('QCA Supplier Action Communication Field Value Delete Access'),
+       'description' => t('Allows users to delete the Supplier Action Communication Field Values.'),
+       ),
+
+       'QCA Supplier Action Communication Field Value Add Access' => array(
+       'title' => t('QCA Supplier Action Communication Field Value Add Access'),
+       'description' => t('Allows users to Add Supplier Action Communication Field Values.'),
+       ),
+
+    );
+}

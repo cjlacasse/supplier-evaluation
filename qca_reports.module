@@ -1,0 +1,558 @@
+<?php
+
+    function qca_reports_menu() {
+      $items = array();
+
+      $items['scorecards_due_report'] = array(
+        'title' => 'Scorecards Due Report',
+        'description' => 'Scorecards Due Report',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('scorecards_due_report',1,2), //$scorecards_due_report_category, $filter_mill
+        'access callback' => 'user_access',
+        'access arguments' => array('QCA Scorecards Due Report Access'),
+      );
+
+      return $items;
+    }
+
+//*********************************************************************
+//*                     SCORECARDS DUE REPORT                         *
+//*********************************************************************
+
+//***Display list of suppliers
+function scorecards_due_report($form, &$form_state, $filter_due_category, $filter_mill)
+{
+    //Reset drupal messages
+    drupal_get_messages();
+
+    $today = date('Y-m-d H:i:s');
+
+    $form_state['new_supplier_flag'] == "NO";
+
+    //new supplier report access
+    $form['scorercards_due_report_overview'] = array(
+     '#type' => 'fieldset',
+     '#title' => t('Overview'),
+    );
+
+    $form['scorercards_due_report_overview']['supplier_administration_summary'] = array(
+    '#markup' => 'Displays overdue and upcoming Scorecards for approved suppliers.  Suppliers marked as \'Idle\' are not included.',
+    );
+
+    //Filters! Filters! Filters!
+
+    //If it is the first pass, then grab the user mill from their profile and use it as the default OR use the one passed in from wherever they came from
+    if($form_state['run_once'] != "Yes")
+    {
+        if (empty($filter_mill))
+        {
+            //use the user default if a mill has not been passed in
+            $scorecards_due_mill = get_user_mill();
+        }
+        else
+        {
+            //if one has been passed in then use it.
+            $scorecards_due_mill = $filter_mill;
+        }
+
+            //for the first run assign filters passed in to use as the defaults
+            //if nothing is passed in their preferred view is 'past due'
+            if(empty($filter_due_category))
+            {
+                $scorecards_due_report_category = "Past Due";
+            }
+            else
+            {
+                $scorecards_due_report_category = $filter_due_category;
+            }
+    }
+
+    //Probably a better way to grab the mills (joint query maybe) but Im going to start with hardcoding them
+    $scorecards_due_mill_options = array('All'=>'All') + array('1001'=>'mill_x') + array('1550'=>'mill_y');
+
+    $form['scorecards_due_report_mill'] = array(
+     '#type' => 'select',
+     '#title' => '',
+     '#options' => $scorecards_due_mill_options,
+     '#required' => FALSE,
+     '#prefix' => '<table id="general_filters_header"><tr><td width="5">Mill: </td><td width="5">',
+     '#suffix' => '</td><td width="5">Due: </td><td width="5">',
+     '#default_value' => $scorecards_due_mill,
+     '#ajax' => array(
+        'callback' =>'ajax_scorecards_due_report_callback',
+        'method' => 'replace',
+        'effect' => 'none',
+        'progress' => array(
+            'type' => 'throbber',
+            'message' => NULL
+        ),
+     ),
+    );
+
+    //If it is not the first pass, get the value from the field
+    if($form_state['run_once'] == "Yes")
+    {
+        //use the user selected mill
+        $scorecards_due_mill = $form_state['values']['scorecards_due_report_mill'];
+    }
+
+    $scorecards_due_categories_options = array('Past Due'=>'Past Due') + array('Due within 30 Days'=>'Due within 30 Days') + array('Due in 31-60 Days'=>'Due in 31-60 Days') + array('Due in 61-90 Days'=>'Due in 61-90 Days') + array('Unknown'=>'Unknown') + array('All'=>'All');
+
+    $form['scorecards_due_report_category'] = array(
+         '#type' => 'select',
+         '#title' => '',
+         '#options' => $scorecards_due_categories_options,
+         '#required' => FALSE,
+         '#prefix' => '',
+         // original line before csv button added '#suffix' => '</td><td></td></tr></table>',
+         '#suffix' => '</td><td width="5" class="administration_list_export_button"><span class="beautytips grow" title="Export scorecard due report data to a comma separated file that is viewable in Excel and can be styled for printing.">',
+         '#default_value' => $scorecards_due_report_category,
+         '#ajax' => array(
+            'callback' =>'ajax_scorecards_due_report_callback',
+            'method' => 'replace',
+            'effect' => 'none',
+            'progress' => array(
+                'type' => 'throbber',
+                'message' => NULL
+            ),
+         ),
+     );
+
+    //If it is not the first pass, get the value from the field
+    if($form_state['run_once'] == "Yes")
+    {
+        //use the user selected mill
+        $scorecards_due_report_category = $form_state['values']['scorecards_due_report_category'];
+    }
+
+    //Add the csv export button
+    $form['export_to_csv_maintenance'] = array(
+      '#type' => 'image_button',
+      '#src' => '/images/csv_download_icon.png',
+      '#prefix' => '',
+      '#suffix' => '</td><td></td></tr></table>',
+      '#submit' => array('export_scorecard_due_to_csv')
+    );
+
+    //Go grab the data dude
+    $select = db_select('company_x_supplier_maintenance', 'g_unit');
+    $select ->fields('g_unit', array(
+                'id',
+                'vendor',
+                'vendor_name',
+                'purchase_org',
+                'approved_status',
+                'approved_date',
+                'provisional_status',
+                'supplier_self_assessment',
+                'product_critical',
+                'volume_gtr_one',
+                'sole_sourced',
+                'critical_to_customer',
+                'next_scorecard_override',
+                'frequency_override',
+                ));
+
+    //Set the conditions based on values collected from filters
+    //Mill
+    if ($scorecards_due_mill == "" || $scorecards_due_mill == "All")
+    {
+        //No filter thank you
+    }
+    else
+    {
+        $select->condition('purchase_org', $scorecards_due_mill);
+    }
+
+    //Only get the suppliers that are approved and not idle
+    $select->condition('approved_status', "YES");
+    $select->condition('idle_status', "NO");
+
+    //Execute the query
+    $results = $select->execute();
+
+    //Throw the rows together
+    $rows = array();
+    foreach ($results as $row) {
+        date_default_timezone_set('America/New_York');
+        $today = date('Y-m-d');
+        $next_scorecard_date = get_next_scorecard_date($row->vendor,"scorecard_due_filter");
+        $supplier_year_selected = date("Y",strtotime($next_scorecard_date));
+        $icons = '<div class="icon_container"><div class="icon_left"><span class="beautytips grow" title="View/Edit Supplier Attributes"><a href="/supplier_administration/' . $row->vendor . '/scorecards_due/' . $scorecards_due_mill . '/0/0/0/' . $scorecards_due_report_category . '">' . '<img src="/images/form_edit.png"></a></span></div>' .
+                 '<div class="icon_right"><span class="beautytips grow" title="Generate Scorecard for ' . $row->vendor_name . '" ><a href="/company_x_forms/form_scorecard/0/' . $row->vendor . '/' . $supplier_year_selected . '/due_report/0/' . $scorecards_due_report_category . '"><img src="/images/plus.png"></a></span></div></div>';
+        $next_scorecard_override = $row->next_scorecard_override;
+
+        //Show the override icon if the supplier has a next scorecard override
+        if ($next_scorecard_override == "Yes")
+        {
+            $next_scorecard_override_display = '<span class="beautytips" title="The scorecard due date has been overridden by a system administrator"><img style="vertical-align:middle" src="/images/warning.png">';
+        }
+        else
+        {
+            $next_scorecard_override_display = "";
+        }
+
+        //Due Date Category
+        //Set due_by_this_date by adding the chosen number of days out, to todays date
+        //Past Due
+        if ($scorecards_due_report_category == "Past Due")
+        {
+          //Test to see if the due dates have already past
+            if ($next_scorecard_date < $today)
+            {
+                $rows[] = array(
+                    $icons,
+                    $row->vendor_name,
+                    $row->vendor,
+                    get_next_scorecard_date($row->vendor) . $next_scorecard_override_display,
+                    date_display_mask(get_latest_scorecard_date($row->vendor)),
+                    get_scorecard_frequency($row->vendor) . ' days',
+                );
+            }//end of test to see if its past due
+        }
+        //Due within 30 days
+        else if ($scorecards_due_report_category == "Due within 30 Days")
+        {
+          $due_by_this_date = date('Y-m-d', strtotime("+30 days"));
+          //Test to see if the scorecard date is less than or equal to the future date, but not past due
+            if ($next_scorecard_date <= $due_by_this_date && $next_scorecard_date >= $today)
+            {
+                $rows[] = array(
+                    $icons,
+                    $row->vendor_name,
+                    $row->vendor,
+                    get_next_scorecard_date($row->vendor) . $next_scorecard_override_display,
+                    date_display_mask(get_latest_scorecard_date($row->vendor)),
+                    get_scorecard_frequency($row->vendor) . ' days',
+                );
+            }//end of if test to check if its less than the future date but not past due
+        }
+        //Due within 60 days
+        else if ($scorecards_due_report_category == "Due in 31-60 Days")
+        {
+          $due_by_this_date = date('Y-m-d', strtotime("+60 days"));
+          $start_with_this_date = date('Y-m-d', strtotime("+31 days"));
+
+          //Test to see if the scorecard date is between 31 and 60 days, but not past due
+            if ($next_scorecard_date >= $start_with_this_date && $next_scorecard_date <= $due_by_this_date)
+            {
+                $rows[] = array(
+                    $icons,
+                    $row->vendor_name,
+                    $row->vendor,
+                    get_next_scorecard_date($row->vendor) . $next_scorecard_override_display,
+                    date_display_mask(get_latest_scorecard_date($row->vendor)),
+                    get_scorecard_frequency($row->vendor) . ' days',
+                );
+            }//end of if test to check if its less than the future date but not past due
+        }
+        //Due within 90 days
+        else if ($scorecards_due_report_category == "Due in 61-90 Days")
+        {
+          $due_by_this_date = date('Y-m-d', strtotime("+90 days"));
+          $start_with_this_date = date('Y-m-d', strtotime("+61 days"));
+
+          //Test to see if the scorecard date is less than or equal to the future date, but not past due
+            if ($next_scorecard_date >= $start_with_this_date && $next_scorecard_date <= $due_by_this_date)
+            {
+                $rows[] = array(
+                    $icons,
+                    $row->vendor_name,
+                    $row->vendor,
+                    get_next_scorecard_date($row->vendor) . $next_scorecard_override_display,
+                    date_display_mask(get_latest_scorecard_date($row->vendor)),
+                    get_scorecard_frequency($row->vendor) . ' days',
+                );
+            }//end of if test to check if its less than the future date but not past due
+        }
+        else if ($scorecards_due_report_category == "Unknown")
+        {
+            if(date('Y-m-d', strtotime($next_scorecard_date)) == '1969-12-31')
+            {
+                $rows[] = array(
+                    $icons,
+                    $row->vendor_name,
+                    $row->vendor,
+                    get_next_scorecard_date($row->vendor) . $next_scorecard_override_display,
+                    date_display_mask(get_latest_scorecard_date($row->vendor)),
+                    get_scorecard_frequency($row->vendor) . ' days',
+                );
+            }//end if statement to check if next scorecard date is empty
+        }
+        //show all
+        else
+        {
+          //show everything
+            $rows[] = array(
+                    $icons,
+                    $row->vendor_name,
+                    $row->vendor,
+                    get_next_scorecard_date($row->vendor) . $next_scorecard_override_display,
+                    date_display_mask(get_latest_scorecard_date($row->vendor)),
+                    get_scorecard_frequency($row->vendor) . ' days',
+                );
+        }
+
+    }//end of the foreach loop to build the rows
+
+
+    //Table settings. This is using the datatables module which talks to the built in jQuery Datatables
+    //We can talk to jQuery's Datatables with straight javascript too, like we did with tabs
+    //but time is short people, and so am I.
+
+    $attributes['datatable_options'] = array(
+      'bFilter'   => TRUE,
+      'bInfo'     => TRUE,
+      'autoWidth' => TRUE,
+      'scrollX' => TRUE,
+      'bStateSave' => TRUE,
+      'aaSorting' => array(
+                        array(3, 'asc'),
+                    ),
+    );
+
+    //Columns headers
+    $header = array(
+      array(
+        'data' => t(''),
+        'datatable_options' => array(
+          'bSortable' => FALSE,
+          'bSearchable' => FALSE,
+        ),
+      ),
+    array(
+        'data' => t('Vendor Name'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Vendor #'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Scorecard Due'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Last Scorecard'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+      array(
+        'data' => t('Frequency'),
+        'datatable_options' => array(
+          'bSortable' => TRUE,
+          'bSearchable' => TRUE,
+        ),
+      ),
+    );//end of header array
+
+    // Render this mofo
+    $variables = array(
+      'attributes' => $attributes,
+      'header' => $header,
+      'rows' => $rows,
+    );
+    $output = theme('datatable', $variables);
+
+    $form['display_scorecards_due_report'] = array(
+         '#markup' => $output,
+         '#prefix' => '<div id="display_scorecards_due_report">',
+         '#suffix' => '</div>',
+        );
+
+    //Flag when the form has been run one time so we can do all sorts of cool things
+        $form_state['run_once'] = "Yes";
+    return $form;
+
+}
+
+//***********************************EXPORT scorecard due TO CSV****************************************
+function export_scorecard_due_to_csv($form, &$form_state)
+{
+    //base where clause to build from if filters are not on ALL
+    $where_clause = "'"."1"."'";
+
+    //add mill to where clause
+    $csv_supplier_admin_list_mill = $form_state['values']['scorecards_due_report_mill'];
+    if($csv_supplier_admin_list_mill == "1001"){
+        $query_mill = "1001";
+        $where_clause .= " AND purchase_org = '".$query_mill."'";
+    }
+    if($csv_supplier_admin_list_mill == "1550"){
+        $query_mill = "1550";
+        $where_clause .= " AND purchase_org = '".$query_mill."'";
+    }
+
+    //only return approved suppliers for the scorecard due report
+    $query_approved = "YES";
+    $where_clause .= " AND approved_status = '".$query_approved."'";
+
+    //only return suppliers that are not idle for the scorecard due report
+    $query_idle = "NO";
+    $where_clause .= " AND idle_status = '".$query_idle."'";
+
+    //determine which report category to return based on filter value
+    $scorecards_due_report_category_csv = $form_state['values']['scorecards_due_report_category'];
+
+
+    //***********************************DB VARIABLES***************************************************
+    //database connection for company_x Supplier Evaluation Application
+    //TEST DB VARIABLES
+    $databasehost = "localhost";
+    $databasename = "company_x";
+    $databaseusername ="glatuser";
+    $databasepassword = "Glat#79924";
+
+    //PRODUCTION DB VARIABLES
+//    $databasehost = "naprdscore01.intglt.com";
+//    $databasename = "company_x";
+//    $databaseusername ="glatuser";
+//    $databasepassword = "Glat#79924";
+    //****************************************************************************************************
+    $mysqli = new mysqli($databasehost,$databaseusername,$databasepassword,$databasename);
+
+    $csv_query = "SELECT purchase_org, vendor,"
+        . "vendor_name, approved_status, approved_date, provisional_status,"
+        . "supplier_self_assessment, product_critical, volume_gtr_one, sole_sourced,"
+        . "critical_to_customer,next_scorecard_override,"
+        . "'fequency' as placeholder, 'next_scorecard_date' as placeholder, frequency_override,'category' as placeholder "
+        . "FROM company_x_supplier_maintenance WHERE ". $where_clause;
+
+
+    $csv_results = $mysqli->query($csv_query);
+    //$csv_results = $mysqli->query( "CALL delivery_csv($csv_query)" );
+
+    //work with the result set object and map it to an array
+    $csv_data = array();
+    while ($rows = $csv_results->fetch_object()) {
+        $csv_data[] = array(
+            $rows->category = get_scorecard_due_category($rows->vendor),
+            $rows->purchase_org,
+            $rows->vendor,
+            $rows->vendor_name,
+            $rows->approved_status,
+            $rows->approved_date,
+            $rows->last_delivery = last_delivery_date($rows->vendor, $rows->purchase_org),
+            $rows->provisional_status,
+            $rows->supplier_self_assessment,
+            $rows->product_critical,
+            $rows->volume_gtr_one,
+            $rows->sole_sourced,
+            $rows->critical_to_customer,
+            get_latest_scorecard_date($rows->vendor),
+            $rows->next_scorecard_date = get_next_scorecard_date($rows->vendor),
+            $rows->next_scorecard_override,
+            $rows->frequency = get_scorecard_frequency($rows->vendor),
+            $rows->frequency_override,
+        );
+    }
+
+    function map_colnames($input){
+        //******$colnames will need to be customized to each data set that is getting exported********
+        $colnames = array(
+            '0'=> "Scorecard Due Category",
+            '1' => "Purchase Org",
+            '2'=> "Vendor",
+            '3'=> "Vendor Name",
+            '4'=> "Approved Status",
+            '5'=> "Approved Date",
+            '6'=> "Last Delivery",
+            '7'=> "Provisional Status",
+            '8'=> "Supplier Self Assessment",
+            '9'=> "Critical to Process",
+            '10'=> "Volume Greater One/Week",
+            '11'=> "Sole Sourced",
+            '12'=> "Critical to Cust.",
+            '13'=> "Last Scorecard",
+            '14'=> "Next Scorecard",
+            '15'=> "Next Scorecard Override",
+            '16'=> "Frequency",
+            '17'=> "Frequency Override",
+        );
+
+      return isset($colnames[$input]) ? $colnames[$input] : $input;
+    }
+
+    function cleanData(&$str){
+        if($str == 't') $str = 'TRUE';
+        if($str == 'f') $str = 'FALSE';
+        if(strstr($str, '"')) $str = '"' . str_replace('"', '""', $str) . '"';
+    }
+
+    // filename for download
+    $filename = "scorecard_due_report_" . date('Ymd') . ".csv";
+
+    header("Content-Disposition: attachment; filename=\"$filename\"");
+    header("Content-Type: text/csv");
+
+    $out = fopen("php://output", 'w');
+
+    $flag = false;
+    foreach($csv_data as $row) {
+        if(!$flag) {
+                // display field/column names as first row
+                $firstline = array_map("map_colnames", array_keys($row));
+                fputcsv($out, $firstline, ',', '"');
+                $flag = true;
+            }
+        array_walk($row, 'cleanData');
+        //drupal_set_message('<pre>'. print_r($row[16], true) .'</pre>');
+        //drupal_set_message('<pre>'. print_r($scorecards_due_report_category_csv, true) .'</pre>');
+
+        //if the category is all, then just export all.  if it is anything but all, then apply filter check
+        if($scorecards_due_report_category_csv != "All"){
+            //only export to the csv file the categories that match the filter
+            if($row[0] == $scorecards_due_report_category_csv){
+                fputcsv($out, array_values($row), ',', '"');
+            }
+        }
+        else{
+            fputcsv($out, array_values($row), ',', '"');
+        }
+    }
+
+
+    fclose($out);
+    $csv_results->close();
+    $mysqli->close();
+    exit;
+}
+
+//***********************************END scorecard due TO CSV************************************
+
+//AJAX TIME!!!
+//Supplier Admin List - Changes made when the filters are changed
+function ajax_scorecards_due_report_callback($form, $form_state)
+{
+
+   //since we want to return multiple elements in multiple areas this array works just dandy
+   return array(
+     '#type' => 'ajax',
+     '#commands' => array(
+
+      ajax_command_replace("#display_scorecards_due_report", render($form['display_scorecards_due_report'])),
+      ajax_command_replace("#scorecards_due_report_supplier", render($form['scorecards_due_report_supplier'])),
+      )
+   );
+}
+
+    //This function adds the forms to the permissions menu
+    function qca_reports_permission() {
+        return array(
+           'QCA Scorecards Due Report Access' => array(
+           'title' => t('QCA Scorecards Due Report Access'),
+           'description' => t('Allows users to access the Scorecards Due Report.'),
+           ),
+        );
+    }
